@@ -16,16 +16,10 @@ namespace BetterHttpClient.Socks
 
         #region Constructors
 
-        public SocksHttpWebResponse(byte[] httpResponseMessageMaybeGzip)
+        public SocksHttpWebResponse(byte[] httpResponseMessage)
         {
-            byte[] decompressed = null;
 
-            if (IsPossiblyGZippedBytes(httpResponseMessageMaybeGzip))
-            {
-                decompressed = Decompress(httpResponseMessageMaybeGzip);
-            }
-
-            SetHeadersAndResponseContent(decompressed ?? httpResponseMessageMaybeGzip);
+            SetHeadersAndResponseContent(httpResponseMessage);
         }
 
         #endregion
@@ -161,6 +155,8 @@ namespace BetterHttpClient.Socks
 
             ResponseContent = new byte[responseMessage.Length - headerEnd - 4];
             Array.Copy(responseMessage, headerEnd + 4, ResponseContent, 0, ResponseContent.Length);
+            ResponseContent = Decompress(ResponseContent) ?? ResponseContent;
+            
         }
 
         #endregion

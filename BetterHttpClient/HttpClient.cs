@@ -2,7 +2,6 @@
 using System.Collections.Specialized;
 using System.Net;
 using System.Text;
-using System.Threading;
 using BetterHttpClient.Socks;
 
 namespace BetterHttpClient
@@ -10,10 +9,39 @@ namespace BetterHttpClient
     public class HttpClient : WebClient
     {
         private CookieContainer _cookies = new CookieContainer();
-      
+
         public Proxy Proxy { get; set; }
-        public int Timeout { get; set; }
-        public int NumberOfTry { get; set; }
+
+        private int _numberOfTry = 1;
+        public int Timeout
+        {
+            get
+            {
+                return _timeout;
+            }
+            set
+            {
+                if(value < 5)
+                    throw new ArgumentOutOfRangeException("Timeout has to be greater or equal than 5!");
+                _timeout = value;
+            }
+        }
+
+        
+        private int _timeout = 60000;
+
+        public int NumberOfTry
+        {
+            get { return _numberOfTry; }
+            set
+            {
+                if(value < 1)
+                    throw new ArgumentOutOfRangeException("Value has to be greater than one.");
+
+                _numberOfTry = value;
+            }
+        }
+
         public bool SuppressWebException { get; set; } = true;
 
         public string UserAgent { get; set; }
@@ -22,6 +50,11 @@ namespace BetterHttpClient
         public string AcceptLanguage { get; set; } = "en-US;q=0.7,en;q=0.3";
         public string AcceptEncoding { get; set; } = "gzip";
 
+        public new Encoding Encoding
+        {
+            get { return base.Encoding; }
+            set { base.Encoding = value; }
+        }
         public HttpClient(Proxy proxy) : this(proxy, Encoding.UTF8) {  }
 
         public HttpClient() : this(new Proxy(), Encoding.UTF8) {  }
@@ -104,11 +137,17 @@ namespace BetterHttpClient
         {
             int counter = 0;
             WebException lastWebException = null;
+            bool unkownProxy = Proxy.ProxyType == ProxyTypeEnum.Unknown;
 
-            while (counter < NumberOfTry)
+            while (counter < NumberOfTry + (unkownProxy ? 1 : 0)) // min two try for unkonwn proxy type
             {
                 try
                 {
+                    if(unkownProxy && counter < Math.Max(NumberOfTry/2, 1))
+                        Proxy.ProxyType = ProxyTypeEnum.Http;
+                    else if(unkownProxy)
+                        Proxy.ProxyType = ProxyTypeEnum.Socks;
+
                     byte[] result = data == null ? Encoding.GetBytes(DownloadString(url)) : UploadValues(url, data);
                     return result;
                 }
@@ -118,6 +157,11 @@ namespace BetterHttpClient
                     counter++;
                 }
             }
+
+            if (unkownProxy)
+                Proxy.ProxyType = ProxyTypeEnum.Unknown;
+
+            Proxy.Working = false;
 
             if (!SuppressWebException && lastWebException != null)
                 throw lastWebException;

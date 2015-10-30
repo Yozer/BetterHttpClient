@@ -31,7 +31,7 @@ namespace BetterHttpClient.Socks
             }
             set
             {
-                SetSpecialHeaders("User-Agent", value);
+                SetSpecialHeaders("User-Agent", value ?? string.Empty);
             }
         }
 
@@ -43,7 +43,7 @@ namespace BetterHttpClient.Socks
             }
             set
             {
-                SetSpecialHeaders("Referer", value);
+                SetSpecialHeaders("Referer", value ?? string.Empty);
             }
         }
         public string Accept
@@ -54,7 +54,7 @@ namespace BetterHttpClient.Socks
             }
             set
             {
-                SetSpecialHeaders("Accept", value);
+                SetSpecialHeaders("Accept", value ?? string.Empty);
             }
         }
 

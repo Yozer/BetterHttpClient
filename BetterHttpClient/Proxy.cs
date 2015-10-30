@@ -14,12 +14,12 @@ namespace BetterHttpClient
             ProxyType = ProxyTypeEnum.None;
         }
 
-        protected Proxy(string address)
+        public Proxy(string address)
         {
             ProxyItem = new WebProxy(address);
         }
 
-        protected Proxy(string ip, int port)
+        public Proxy(string ip, int port)
         {
             ProxyItem = new WebProxy(ip, port);
         }
