@@ -46,6 +46,7 @@
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Proxy.cs" />
+    <Compile Include="ProxyManager.cs" />
     <Compile Include="Socks\SocksHttpWebRequest.cs" />
     <Compile Include="Socks\SocksHttpWebResponse.cs" />
   </ItemGroup>

@@ -4,7 +4,14 @@ namespace BetterHttpClient
 {
     public class Proxy
     {
-        public bool Working { get; internal set; }
+        private volatile bool _isBusy = false;
+
+        public bool IsBusy
+        {
+            get { return _isBusy; }
+            internal set { _isBusy = value; }
+        }
+        public bool Working { get; internal set; } = true;
         public ProxyTypeEnum ProxyType { get; internal set; }
         internal WebProxy ProxyItem { get; }
 

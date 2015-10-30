@@ -12,7 +12,7 @@ namespace BetterHttpClient
 
         public Proxy Proxy { get; set; }
 
-        private int _numberOfTry = 1;
+        private int _numberOfTry = 4;
         public int Timeout
         {
             get
@@ -26,10 +26,8 @@ namespace BetterHttpClient
                 _timeout = value;
             }
         }
-
         
         private int _timeout = 60000;
-
         public int NumberOfTry
         {
             get { return _numberOfTry; }
@@ -44,7 +42,7 @@ namespace BetterHttpClient
 
         public bool SuppressWebException { get; set; } = true;
 
-        public string UserAgent { get; set; }
+        public string UserAgent { get; set; } = "Mozilla/5.0 (Windows NT 6.3; WOW64; rv:41.0) Gecko/20100101 Firefox/41.0";
         public string Accept { get; set; } = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
         public string Referer { get; set; }
         public string AcceptLanguage { get; set; } = "en-US;q=0.7,en;q=0.3";
@@ -143,7 +141,7 @@ namespace BetterHttpClient
             {
                 try
                 {
-                    if(unkownProxy && counter < Math.Max(NumberOfTry/2, 1))
+                    if(unkownProxy && counter % 2 == 0) // every odd try is as http proxy
                         Proxy.ProxyType = ProxyTypeEnum.Http;
                     else if(unkownProxy)
                         Proxy.ProxyType = ProxyTypeEnum.Socks;
