@@ -8,11 +8,10 @@ namespace BetterHttpClient
 {
     public class HttpClient : WebClient
     {
-        private CookieContainer _cookies = new CookieContainer();
+        public CookieContainer Cookies { get; internal set; } = new CookieContainer();
 
         public Proxy Proxy { get; set; }
 
-        private int _numberOfTry = 4;
         public int Timeout
         {
             get
@@ -26,21 +25,21 @@ namespace BetterHttpClient
                 _timeout = value;
             }
         }
-        
+
+        private int _numberOfAttempts = 4;
         private int _timeout = 60000;
-        public int NumberOfTry
+
+        public int NumberOfAttempts
         {
-            get { return _numberOfTry; }
+            get { return _numberOfAttempts; }
             set
             {
                 if(value < 1)
                     throw new ArgumentOutOfRangeException("Value has to be greater than one.");
 
-                _numberOfTry = value;
+                _numberOfAttempts = value;
             }
         }
-
-        public bool SuppressWebException { get; set; } = true;
 
         public string UserAgent { get; set; } = "Mozilla/5.0 (Windows NT 6.3; WOW64; rv:41.0) Gecko/20100101 Firefox/41.0";
         public string Accept { get; set; } = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
@@ -56,6 +55,7 @@ namespace BetterHttpClient
         public HttpClient(Proxy proxy) : this(proxy, Encoding.UTF8) {  }
 
         public HttpClient() : this(new Proxy(), Encoding.UTF8) {  }
+        public HttpClient(Encoding encoding) : this(new Proxy(), encoding) { }
         public HttpClient(Proxy proxy, Encoding encoding)
         {
             Encoding = encoding;
@@ -78,7 +78,7 @@ namespace BetterHttpClient
                 request.ContentType = base.GetWebRequest(address).ContentType;
             }
 
-            request.Headers.Add("Cookie", _cookies.GetCookieHeader(address));
+            request.Headers.Add("Cookie", Cookies.GetCookieHeader(address));
             request.Headers.Add("Accept-Language", AcceptLanguage);
             request.Headers.Add("Accept-Encoding", AcceptEncoding);
 
@@ -111,7 +111,7 @@ namespace BetterHttpClient
             try
             {
                 string setCookies = response.Headers["Set-Cookie"];
-                _cookies.SetCookies(request.RequestUri, setCookies);
+                Cookies.SetCookies(request.RequestUri, setCookies);
             }
             catch (Exception)
             {
@@ -137,7 +137,7 @@ namespace BetterHttpClient
             WebException lastWebException = null;
             bool unkownProxy = Proxy.ProxyType == ProxyTypeEnum.Unknown;
 
-            while (counter < NumberOfTry + (unkownProxy ? 1 : 0)) // min two try for unkonwn proxy type
+            while (counter < NumberOfAttempts + (unkownProxy ? 1 : 0)) // min two try for unkonwn proxy type
             {
                 try
                 {
@@ -159,12 +159,8 @@ namespace BetterHttpClient
             if (unkownProxy)
                 Proxy.ProxyType = ProxyTypeEnum.Unknown;
 
-            Proxy.Working = false;
-
-            if (!SuppressWebException && lastWebException != null)
-                throw lastWebException;
-
-            return null;
+            // ReSharper disable once PossibleNullReferenceException
+             throw lastWebException;
         }
     }
 
