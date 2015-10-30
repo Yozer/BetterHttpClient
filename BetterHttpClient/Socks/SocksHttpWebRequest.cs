@@ -9,7 +9,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace HttpClient.Socks
+namespace BetterHttpClient.Socks
 {
     class SocksHttpWebRequest : WebRequest
     {

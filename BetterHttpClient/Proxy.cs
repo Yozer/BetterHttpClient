@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace HttpClient
+namespace BetterHttpClient
 {
     public class Proxy
     {

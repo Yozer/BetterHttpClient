@@ -4,7 +4,7 @@ using System.IO.Compression;
 using System.Net;
 using System.Text;
 
-namespace HttpClient.Socks
+namespace BetterHttpClient.Socks
 {
     internal class SocksHttpWebResponse : WebResponse
     {

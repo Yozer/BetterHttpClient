@@ -3,9 +3,9 @@ using System.Collections.Specialized;
 using System.Net;
 using System.Text;
 using System.Threading;
-using HttpClient.Socks;
+using BetterHttpClient.Socks;
 
-namespace HttpClient
+namespace BetterHttpClient
 {
     public class HttpClient : WebClient
     {
