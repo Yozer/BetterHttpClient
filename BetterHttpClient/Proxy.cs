@@ -12,6 +12,8 @@ namespace BetterHttpClient
             internal set { _isBusy = value; }
         }
 
+        internal bool IsChecked { get; set; }
+        public bool IsAnonymous { get; set; }
         public bool IsOnline { get; set; } = true;
         public ProxyTypeEnum ProxyType { get; internal set; }
         internal WebProxy ProxyItem { get; }
