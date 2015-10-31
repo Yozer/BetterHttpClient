@@ -22,7 +22,7 @@ string page = client.Get("http://www.google.com");
 
 - Http POST request
 ```cs
-HttpClient client = new HttpClient(); // if no headers are specified will use defaults
+HttpClient client = new HttpClient(); // if no headers are specified defaults will be used
 string page = client.Post("https://httpbin.org/post", new NameValueCollection
 {
     {"custname", "Some post data"},
