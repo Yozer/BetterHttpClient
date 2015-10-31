@@ -1,6 +1,6 @@
 # BetterHttpClient
 
-BetterHttpClient will help you making http and https requests.
+BetterHttpClient will help you making http and https requests with full cookie support.
 
 It supports three types of proxy servers:
   - HTTP
@@ -31,7 +31,7 @@ string page = client.Post("https://httpbin.org/post", new NameValueCollection
 
 - Https GET request using proxy
 
-HttpClient will detect proxy type (http/s, socks5) if you don't such info.
+HttpClient will detect proxy type (http/s, socks5) if you don't provide such info.
 ```cs
 string proxyAddress = "218.200.66.196:8080";
 HttpClient client = new HttpClient(new Proxy(proxyAddress))
