@@ -21,8 +21,8 @@ namespace BetterHttpClient
         public string AcceptLanguage { get; set; } = "en-US;q=0.7,en;q=0.3";
         public string AcceptEncoding { get; set; } = "gzip";
         /// <summary>
-        /// String that returned page has to contain.
-        /// It helps to check if returned page is the page which we watned to recieve.
+        /// String which returned page has to contain.
+        /// It helps to check if returned page is the page which we watned to receive.
         /// Proxy sometimes are returing some other pages.
         /// </summary>
         /// 
@@ -97,32 +97,56 @@ namespace BetterHttpClient
                     // parsing exception
                 }
             }
+            NumberOfAttemptsPerRequest = _proxies.Count;
         }
 
         public ProxyManager(string file) : this(File.ReadLines(file)) { }
 
         public string GetPage(string url)
         {
-            string page = null;
-            while ((page = Encoding.GetString(DownloadBytes(url))).Contains(RequiredString)) ;
-            return page;
+            return PostPage(url, null);
         }
 
         public string PostPage(string url, NameValueCollection data)
         {
             string page = null;
-            while((page = Encoding.GetString(DownloadBytes(url, data))).Contains(RequiredString));
+            int limit = 0;
+
+            do
+            {
+                Proxy proxy = GetAvalibleProxy();
+                page = Encoding.GetString(DownloadBytes(url, data, proxy));
+                if (!page.Contains(RequiredString))
+                {
+                    proxy.IsBusy = false;
+                    proxy.IsOnline = false;
+                }
+                else
+                {
+                    proxy.IsBusy = false;
+                    return page;
+                }
+
+                limit++;
+            } while (limit < NumberOfAttemptsPerRequest);
             return page;
         }
 
         public byte[] DownloadBytes(string url, NameValueCollection data)
+        {
+            Proxy proxy = GetAvalibleProxy();
+            byte[] result = DownloadBytes(url, data, proxy);
+            proxy.IsBusy = false;
+            return result;
+
+        }
+        private byte[] DownloadBytes(string url, NameValueCollection data, Proxy proxy)
         {
             int limit = 0;
 
             do
             {
                 HttpClient client = CreateHttpClient();
-                Proxy proxy = GetAvalibleProxy();
                 client.Proxy = proxy;
 
                 try
@@ -131,11 +155,8 @@ namespace BetterHttpClient
                 }
                 catch (WebException)
                 {
+                    proxy.IsOnline = false;
                     limit++;
-                }
-                finally
-                {
-                    proxy.IsBusy = false;
                 }
 
             } while (limit < NumberOfAttemptsPerRequest);
@@ -160,10 +181,10 @@ namespace BetterHttpClient
 
                 do
                 {
-                    if (_proxies.Count(t => t.IsBusy) == 0)
+                    if (_proxies.Count(t => t.IsOnline) == 0)
                         throw new AllProxiesBannedException();
 
-                    selectedProxy = _proxies.SingleOrDefault(t => t.IsBusy && !t.IsBusy);
+                    selectedProxy = _proxies.FirstOrDefault(t => t.IsOnline && !t.IsBusy);
                     if(selectedProxy == null)
                         Thread.Sleep(1);
 
