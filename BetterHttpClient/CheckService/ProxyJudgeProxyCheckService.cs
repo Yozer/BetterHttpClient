@@ -1,4 +1,3 @@
-using System;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -23,9 +22,10 @@ namespace BetterHttpClient.CheckService
             {
                 proxy.IsOnline = false;
             }
+
             if (page == null)
                 return false;
-            else if (page.Contains("<title>Proxyjudge.info</title>") && !page.Contains(MyIp))
+            if (page.Contains("<title>Proxyjudge.info</title>") && !page.Contains(MyIp))
                 return true;
             return false;
         }
@@ -41,9 +41,5 @@ namespace BetterHttpClient.CheckService
             else
                 return match.Groups[1].Value;
         }
-    }
-
-    public class GetMyIpException : Exception
-    {
     }
 }

@@ -1,19 +1,24 @@
 using System.Net;
+using BetterHttpClient.CheckService;
 
 namespace BetterHttpClient
 {
     public class Proxy
     {
         private volatile bool _isBusy = false;
+        private bool _isAnonymous;
+        private bool _isChecked = false;
 
+        /// <summary>
+        /// Check if proxy is busy.
+        /// </summary>
         public bool IsBusy
         {
             get { return _isBusy; }
             internal set { _isBusy = value; }
         }
 
-        internal bool IsChecked { get; set; }
-        public bool IsAnonymous { get; set; }
+
         public bool IsOnline { get; set; } = true;
         public ProxyTypeEnum ProxyType { get; internal set; }
         internal WebProxy ProxyItem { get; }
@@ -32,6 +37,20 @@ namespace BetterHttpClient
         public Proxy(string ip, int port)
         {
             ProxyItem = new WebProxy(ip, port);
+        }
+
+        /// <summary>
+        /// Returns true if proxy can hide your ip address
+        /// </summary>
+        public bool IsAnonymous(ProxyCheckService service)
+        {
+            if (_isChecked)
+                return _isAnonymous;
+
+            _isAnonymous = service.IsProxyAnonymous(this);
+            _isChecked = true;
+            IsOnline = _isAnonymous;
+            return _isAnonymous;
         }
     }
 

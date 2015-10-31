@@ -16,19 +16,39 @@ namespace BetterHttpClient
         private string _requiredString = string.Empty;
         private CookieContainer _cookies = new CookieContainer();
         private int _numberOfAttemptsPerRequest;
-        private int _timeout = 60000;
+        private TimeSpan _timeout = TimeSpan.FromSeconds(10);
         private int _numberOfAttempts = 4;
         private ProxyCheckService _proxyCheckService;
 
+        /// <summary>
+        /// Set User-Agent header.
+        /// </summary>
+        /// <value>Default value: "Mozilla/5.0 (Windows NT 6.3; WOW64; rv:41.0) Gecko/20100101 Firefox/41.0"</value>
         public string UserAgent { get; set; } = "Mozilla/5.0 (Windows NT 6.3; WOW64; rv:41.0) Gecko/20100101 Firefox/41.0";
+        /// <summary>
+        /// Set Accept header.
+        /// </summary>
+        /// <value>Default value: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"</value>
         public string Accept { get; set; } = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
+        /// <summary>
+        /// Set Referer header.
+        /// </summary>
+        /// <value>Default value: null</value>
         public string Referer { get; set; }
+        /// <summary>
+        /// Set Accept-Language header.
+        /// </summary>
+        /// <value>Default value: "en-US;q=0.7,en;q=0.3"</value>
         public string AcceptLanguage { get; set; } = "en-US;q=0.7,en;q=0.3";
-        public string AcceptEncoding { get; set; } = "gzip";
+        /// <summary>
+        /// Set default Accept-Encoding header.
+        /// </summary>
+        /// <value>Default value: "gzip, deflate"</value>
+        public string AcceptEncoding { get; set; } = "gzip, deflate";
 
         /// <summary>
         /// Set proxy check service.
-        /// Must implement IProxyCheckService interface.
+        /// Must derive from ProxyCheckService class.
         /// </summary>
         public ProxyCheckService ProxyCheckService
         {
@@ -41,22 +61,32 @@ namespace BetterHttpClient
             }
         }
         /// <summary>
-        /// String which returned page has to contain.
+        /// Downloaded page has to contain this tring.
         /// It helps to check if returned page is the page which we watned to receive.
         /// Proxy sometimes are returing some other pages.
+        /// Default value string.Empty
         /// </summary>
         public string RequiredString
         {
             get { return _requiredString; }
             set { _requiredString = value ?? string.Empty; }
         }
+        /// <summary>
+        /// Set encoding for request.
+        /// </summary>
+        /// <value>Default value: UTF-8</value>
         public Encoding Encoding { get; set; } = Encoding.UTF8;
         /// <summary>
         /// Set this to true if you want to use only anonymous proxies.
-        /// Defalut false.
         /// </summary>
+        /// <value>Default value: false</value>
         public bool AnonymousProxyOnly { get; } = false;
-        public int Timeout
+        /// <summary>
+        /// Timeout for request.
+        /// </summary>
+        /// <value>Has to be greater than 5 milliseconds.<para />
+        /// Default value: 10 seconds.</value>
+        public TimeSpan Timeout
         {
             get
             {
@@ -64,14 +94,14 @@ namespace BetterHttpClient
             }
             set
             {
-                if (value < 5)
-                    throw new ArgumentOutOfRangeException("Timeout has to be greater or equal than 5!");
+                if (value.TotalMilliseconds < 5)
+                    throw new ArgumentOutOfRangeException("Timeout has to be greater or equal than 5 milliseconds.");
                 _timeout = value;
             }
         }
         /// <summary>
         /// Set how many attempts can be made to execute request on one proxy.
-        /// Default value is default value of HttpClient class.
+        /// Default value is default value is equal 4
         /// </summary>
         public int NumberOfAttempts
         {
@@ -86,7 +116,7 @@ namespace BetterHttpClient
             }
         }
         /// <summary>
-        /// If true cookies are preserved between requests.
+        /// If true cookies are preserved between diffrent requests.
         /// </summary>
         public bool PreserveCookies { get; set; } = false;
 
@@ -112,16 +142,25 @@ namespace BetterHttpClient
             _numberOfAttemptsPerRequest = _proxies.Count + 1;
             _proxyCheckService.NumberOfAttempts = _numberOfAttempts;
         }
-
         public ProxyManager(string file) : this(File.ReadLines(file), false, new ProxyJudgeProxyCheckService()) { }
         public ProxyManager(string file, bool anonymousOnly) : this(File.ReadLines(file), anonymousOnly, new ProxyJudgeProxyCheckService()) { }
         public ProxyManager(string file, bool anonymousOnly, ProxyCheckService service) : this(File.ReadLines(file), anonymousOnly, service) { }
 
+        /// <summary>
+        /// Downloads url using GET.
+        /// </summary>
+        /// <param name="url"></param>
+        /// <returns></returns>
         public string GetPage(string url)
         {
             return PostPage(url, null);
         }
-
+       /// <summary>
+       /// Downloads url using POST.
+       /// </summary>
+       /// <param name="url"></param>
+       /// <param name="data"></param>
+       /// <returns></returns>
         public string PostPage(string url, NameValueCollection data)
         {
             string page = null;
@@ -135,11 +174,9 @@ namespace BetterHttpClient
                 {
                     if (AnonymousProxyOnly)
                     {
-                        if (!proxy.IsChecked)
+                        if (AnonymousProxyOnly && !proxy.IsAnonymous(ProxyCheckService))
                         {
-                            CheckProxy(proxy);
-                            if(!proxy.IsOnline)
-                                continue;
+                            continue;
                         }
                     }
 
@@ -169,10 +206,14 @@ namespace BetterHttpClient
 
             throw new AllProxiesBannedException();
         }
-
+        /// <summary>
+        /// Downloads url using POST.
+        /// </summary>
+        /// <param name="url"></param>
+        /// <param name="data"></param>
+        /// <returns></returns>
         public byte[] DownloadBytes(string url, NameValueCollection data)
         {
-            byte[] result = null;
             int limit = 0;
 
             do
@@ -181,17 +222,12 @@ namespace BetterHttpClient
 
                 try
                 {
-                    if (AnonymousProxyOnly)
+                    if (AnonymousProxyOnly && !proxy.IsAnonymous(ProxyCheckService))
                     {
-                        if (!proxy.IsChecked)
-                        {
-                            CheckProxy(proxy);
-                            if (!proxy.IsOnline)
-                                continue;
-                        }
+                        continue;
                     }
 
-                    result = DownloadBytes(url, data, proxy);
+                    byte[] result = DownloadBytes(url, data, proxy);
 
                     if (result != null)
                     {
@@ -210,30 +246,17 @@ namespace BetterHttpClient
             throw new AllProxiesBannedException();
         }
 
-        private byte[] DownloadBytes(string url, NameValueCollection data, Proxy proxy)
-        {
-
-            HttpClient client = CreateHttpClient();
-            client.Proxy = proxy;
-
-            try
-            {
-                return client.DownloadBytes(url, data);
-            }
-            catch (WebException)
-            {
-                proxy.IsOnline = false;
-            }
-
-            return null;
-        }
-
+        /// <summary>
+        /// Downloads url using GET.
+        /// </summary>
+        /// <param name="url"></param>
+        /// <returns></returns>
         public byte[] DownloadBytes(string url)
         {
             return DownloadBytes(url, null);
         }
         /// <summary>
-        /// 
+        /// Returns first free (but busy) and working proxy.
         /// </summary>
         /// <returns></returns>
         /// <exception cref="AllProxiesBannedException">All proxies are banned. You can't make request.</exception>
@@ -259,6 +282,22 @@ namespace BetterHttpClient
             }
         }
 
+        private byte[] DownloadBytes(string url, NameValueCollection data, Proxy proxy)
+        {
+            HttpClient client = CreateHttpClient();
+            client.Proxy = proxy;
+
+            try
+            {
+                return client.DownloadBytes(url, data);
+            }
+            catch (WebException)
+            {
+                proxy.IsOnline = false;
+            }
+
+            return null;
+        }
         private HttpClient CreateHttpClient()
         {
             HttpClient client = new HttpClient(Encoding)
@@ -275,13 +314,6 @@ namespace BetterHttpClient
             if (PreserveCookies)
                 client.Cookies = _cookies;
             return client;
-        }
-        private void CheckProxy(Proxy proxy)
-        {
-            bool isAnonymous = _proxyCheckService.IsProxyAnonymous(proxy);
-            proxy.IsAnonymous = isAnonymous;
-            proxy.IsChecked = true;
-            proxy.IsOnline = isAnonymous;
         }
     }
 
