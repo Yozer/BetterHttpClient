@@ -18,7 +18,7 @@ namespace BetterHttpClient
         private int _numberOfAttemptsPerRequest;
         private TimeSpan _timeout = TimeSpan.FromSeconds(10);
         private int _numberOfAttempts = 4;
-        private ProxyCheckService _proxyCheckService;
+        private ProxyJudgeService _proxyJudgeService;
 
         /// <summary>
         /// Set User-Agent header.
@@ -50,14 +50,14 @@ namespace BetterHttpClient
         /// Set proxy check service.
         /// Must derive from ProxyCheckService class.
         /// </summary>
-        public ProxyCheckService ProxyCheckService
+        public ProxyJudgeService ProxyJudgeService
         {
-            get { return _proxyCheckService; }
+            get { return _proxyJudgeService; }
             set
             {
                 if(value == null)
                     throw new ArgumentNullException();
-                _proxyCheckService = value;
+                _proxyJudgeService = value;
             }
         }
         /// <summary>
@@ -112,7 +112,7 @@ namespace BetterHttpClient
                     throw new ArgumentOutOfRangeException("Value has to be greater than one.");
 
                 _numberOfAttempts = value;
-                _proxyCheckService.NumberOfAttempts = _numberOfAttempts;
+                _proxyJudgeService.NumberOfAttempts = _numberOfAttempts;
             }
         }
         /// <summary>
@@ -120,9 +120,9 @@ namespace BetterHttpClient
         /// </summary>
         public bool PreserveCookies { get; set; } = false;
 
-        public ProxyManager(IEnumerable<string> proxies, bool anonymousOnly, ProxyCheckService proxyCheckService)
+        public ProxyManager(IEnumerable<string> proxies, bool anonymousOnly, ProxyJudgeService proxyJudgeService)
         {
-            if(proxies == null || proxyCheckService == null)
+            if(proxies == null || proxyJudgeService == null)
                 throw new ArgumentNullException();
 
             foreach (string proxy in proxies)
@@ -138,13 +138,13 @@ namespace BetterHttpClient
             }
 
             AnonymousProxyOnly = anonymousOnly;
-            _proxyCheckService = proxyCheckService;
+            _proxyJudgeService = proxyJudgeService;
             _numberOfAttemptsPerRequest = _proxies.Count + 1;
-            _proxyCheckService.NumberOfAttempts = _numberOfAttempts;
+            _proxyJudgeService.NumberOfAttempts = _numberOfAttempts;
         }
-        public ProxyManager(string file) : this(File.ReadLines(file), false, new ProxyJudgeProxyCheckService()) { }
-        public ProxyManager(string file, bool anonymousOnly) : this(File.ReadLines(file), anonymousOnly, new ProxyJudgeProxyCheckService()) { }
-        public ProxyManager(string file, bool anonymousOnly, ProxyCheckService service) : this(File.ReadLines(file), anonymousOnly, service) { }
+        public ProxyManager(string file) : this(File.ReadLines(file), false, new ProxyJudgeJudgeService()) { }
+        public ProxyManager(string file, bool anonymousOnly) : this(File.ReadLines(file), anonymousOnly, new ProxyJudgeJudgeService()) { }
+        public ProxyManager(string file, bool anonymousOnly, ProxyJudgeService service) : this(File.ReadLines(file), anonymousOnly, service) { }
 
         /// <summary>
         /// Downloads url using GET.
@@ -174,7 +174,7 @@ namespace BetterHttpClient
                 {
                     if (AnonymousProxyOnly)
                     {
-                        if (AnonymousProxyOnly && !proxy.IsAnonymous(ProxyCheckService))
+                        if (AnonymousProxyOnly && !proxy.IsAnonymous(ProxyJudgeService))
                         {
                             continue;
                         }
@@ -222,7 +222,7 @@ namespace BetterHttpClient
 
                 try
                 {
-                    if (AnonymousProxyOnly && !proxy.IsAnonymous(ProxyCheckService))
+                    if (AnonymousProxyOnly && !proxy.IsAnonymous(ProxyJudgeService))
                     {
                         continue;
                     }

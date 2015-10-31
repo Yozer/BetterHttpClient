@@ -42,7 +42,7 @@ namespace BetterHttpClient
         /// <summary>
         /// Returns true if proxy can hide your ip address
         /// </summary>
-        public bool IsAnonymous(ProxyCheckService service)
+        public bool IsAnonymous(ProxyJudgeService service)
         {
             if (_isChecked)
                 return _isAnonymous;

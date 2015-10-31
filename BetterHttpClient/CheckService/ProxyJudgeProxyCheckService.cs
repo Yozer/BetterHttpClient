@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 
 namespace BetterHttpClient.CheckService
 {
-    public class ProxyJudgeProxyCheckService : ProxyCheckService
+    public class ProxyJudgeJudgeService : ProxyJudgeService
     {
         public override bool IsProxyAnonymous(Proxy proxy)
         {
