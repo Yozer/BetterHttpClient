@@ -137,7 +137,7 @@ namespace BetterHttpClient
             WebException lastWebException = null;
             bool unkownProxy = Proxy.ProxyType == ProxyTypeEnum.Unknown;
 
-            while (counter < NumberOfAttempts + (unkownProxy ? 1 : 0)) // min two try for unkonwn proxy type
+            while (counter < NumberOfAttempts + (NumberOfAttempts < 2 && unkownProxy ? 1 : 0)) // min two try for unkonwn proxy type
             {
                 try
                 {

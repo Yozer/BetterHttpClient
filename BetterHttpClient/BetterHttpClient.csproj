@@ -50,7 +50,7 @@
     <Compile Include="ProxyManager.cs" />
     <Compile Include="Socks\SocksHttpWebRequest.cs" />
     <Compile Include="Socks\SocksHttpWebResponse.cs" />
-    <Compile Include="CheckService\UrihProxyCheckService.cs" />
+    <Compile Include="CheckService\ProxyJudgeProxyCheckService.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

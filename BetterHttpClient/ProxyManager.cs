@@ -82,6 +82,7 @@ namespace BetterHttpClient
                     throw new ArgumentOutOfRangeException("Value has to be greater than one.");
 
                 _numberOfAttempts = value;
+                _proxyCheckService.NumberOfAttempts = _numberOfAttempts;
             }
         }
         /// <summary>
@@ -109,10 +110,11 @@ namespace BetterHttpClient
             AnonymousProxyOnly = anonymousOnly;
             _proxyCheckService = proxyCheckService;
             _numberOfAttemptsPerRequest = _proxies.Count + 1;
+            _proxyCheckService.NumberOfAttempts = _numberOfAttempts;
         }
 
-        public ProxyManager(string file) : this(File.ReadLines(file), false, new UrihProxyCheckService()) { }
-        public ProxyManager(string file, bool anonymousOnly) : this(File.ReadLines(file), anonymousOnly, new UrihProxyCheckService()) { }
+        public ProxyManager(string file) : this(File.ReadLines(file), false, new ProxyJudgeProxyCheckService()) { }
+        public ProxyManager(string file, bool anonymousOnly) : this(File.ReadLines(file), anonymousOnly, new ProxyJudgeProxyCheckService()) { }
         public ProxyManager(string file, bool anonymousOnly, ProxyCheckService service) : this(File.ReadLines(file), anonymousOnly, service) { }
 
         public string GetPage(string url)
@@ -266,7 +268,8 @@ namespace BetterHttpClient
                 AcceptLanguage = AcceptLanguage,
                 NumberOfAttempts = NumberOfAttempts,
                 UserAgent = UserAgent,
-                Referer = Referer
+                Referer = Referer,
+                Timeout = Timeout
             };
 
             if (PreserveCookies)

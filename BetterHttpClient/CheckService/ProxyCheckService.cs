@@ -21,7 +21,7 @@ namespace BetterHttpClient.CheckService
             }
         }
 
-
+        public int NumberOfAttempts { get; set; }
         public abstract bool IsProxyAnonymous(Proxy proxy);
         protected abstract string GetMyIp();
     }
