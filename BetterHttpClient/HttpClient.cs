@@ -226,7 +226,7 @@ namespace BetterHttpClient
             if (unkownProxy)
                 Proxy.ProxyType = ProxyTypeEnum.Unknown;
             // ReSharper disable once PossibleNullReferenceException
-             throw lastWebException;
+            throw lastWebException;
         }
     }
 

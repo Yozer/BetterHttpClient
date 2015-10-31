@@ -281,6 +281,17 @@ namespace BetterHttpClient
                 return selectedProxy;
             }
         }
+        /// <summary>
+        /// Sets all proxies IsOnline property to true.
+        /// </summary>
+        public void SetAllProxyAsOnline()
+        {
+            lock (_proxies)
+            {
+                _proxies.ForEach(t => t.IsOnline = true);
+            }
+        }
+
 
         private byte[] DownloadBytes(string url, NameValueCollection data, Proxy proxy)
         {
