@@ -142,8 +142,8 @@ namespace BetterHttpClient
             _numberOfAttemptsPerRequest = _proxies.Count + 1;
             _proxyJudgeService.NumberOfAttempts = _numberOfAttempts;
         }
-        public ProxyManager(string file) : this(File.ReadLines(file), false, new ProxyJudgeJudgeService()) { }
-        public ProxyManager(string file, bool anonymousOnly) : this(File.ReadLines(file), anonymousOnly, new ProxyJudgeJudgeService()) { }
+        public ProxyManager(string file) : this(File.ReadLines(file), false, new ProxyJudgeService()) { }
+        public ProxyManager(string file, bool anonymousOnly) : this(File.ReadLines(file), anonymousOnly, new ProxyJudgeService()) { }
         public ProxyManager(string file, bool anonymousOnly, ProxyJudgeService service) : this(File.ReadLines(file), anonymousOnly, service) { }
 
         /// <summary>

@@ -2,7 +2,7 @@
 
 namespace BetterHttpClient.CheckService
 {
-    public abstract class ProxyJudgeService
+    public abstract class ProxyJudgeServiceAbstract
     {
         private string _myIp = null;
         private readonly object _syncLock = new object();
