@@ -272,8 +272,10 @@ namespace BetterHttpClient
                         throw new AllProxiesBannedException();
 
                     selectedProxy = _proxies.FirstOrDefault(t => t.IsOnline && !t.IsBusy);
-                    if(selectedProxy == null)
-                        Thread.Sleep(1);
+                    if (selectedProxy == null)
+                    {
+                        Thread.Sleep(35);
+                    }
 
                 } while (selectedProxy == null);
 
