@@ -115,23 +115,34 @@ namespace BetterHttpClient
             }
         }
 
-        public ProxyManager(IEnumerable<string> proxies, bool anonymousOnly, ProxyJudgeService proxyJudgeService)
+        /// <param name="proxies">Proxy list</param>
+        /// <param name="anonymousOnly">Set true if you want to filter proxy list and use only anonymous only</param>
+        /// <param name="proxyJudgeService">Proxy judge service is used to determine proxy anonymity level</param>
+        /// <exception cref="ArgumentNullException"></exception>
+        public ProxyManager(IEnumerable<string> proxies, bool anonymousOnly, ProxyJudgeService proxyJudgeService) :
+            this(ParseProxies(proxies), anonymousOnly, proxyJudgeService)
         {
-            if(proxies == null || proxyJudgeService == null)
-                throw new ArgumentNullException();
+        }
 
-            foreach (string proxy in proxies)
+        /// <param name="proxies">Proxy list</param>
+        /// <param name="anonymousOnly">Set true if you want to filter proxy list and use only anonymous only</param>
+        /// <param name="proxyJudgeService">Proxy judge service is used to determine proxy anonymity level</param>
+        /// <exception cref="ArgumentNullException"></exception>
+        public ProxyManager(IEnumerable<Proxy> proxies, bool anonymousOnly, ProxyJudgeService proxyJudgeService)
+        {
+            if (proxies == null || proxyJudgeService == null)
+                throw new ArgumentNullException();
+            foreach (Proxy proxy in proxies)
             {
                 try
                 {
-                    _proxies.Add(new Proxy(proxy));
+                    _proxies.Add(proxy);
                 }
                 catch (UriFormatException)
                 {
                     // parsing exception
                 }
             }
-
             AnonymousProxyOnly = anonymousOnly;
             _proxyJudgeService = proxyJudgeService;
             _numberOfAttemptsPerRequest = _proxies.Count + 1;
@@ -144,10 +155,11 @@ namespace BetterHttpClient
         /// <summary>
         /// Downloads url using GET.
         /// </summary>
-        /// <param name="url"></param>
-        /// <param name="cookies"></param>
-        /// <param name="referer"></param>
+        /// <param name="url">Url of webpage</param>
+        /// <param name="cookies">Cookies for request. Left null if you don't want to use cookies</param>
+        /// <param name="referer">Referer for request.</param>
         /// <returns></returns>
+        /// <exception cref="WebPageNotFoundException">Page has returned 404 not found</exception>
         public string GetPage(string url, string requiredString = null, CookieContainer cookies = null, string referer = null)
         {
             return PostPage(url, null, requiredString, cookies, referer);
@@ -156,10 +168,11 @@ namespace BetterHttpClient
         /// <summary>
         /// Downloads url using POST.
         /// </summary>
-        /// <param name="url"></param>
-        /// <param name="data"></param>
-        /// <param name="cookies"></param>
-        /// <param name="referer"></param>
+        /// <param name="url">Url of webpage</param>
+        /// <param name="data">Post values</param>
+        /// <param name="cookies">Cookies for request. Left null if you don't want to use cookies</param>
+        /// <param name="referer">Referer for request.</param>
+        /// <exception cref="WebPageNotFoundException">Page has returned 404 not found</exception>
         /// <returns></returns>
         public string PostPage(string url, NameValueCollection data, string requiredString = null, CookieContainer cookies = null, string referer = null)
         {
@@ -213,10 +226,11 @@ namespace BetterHttpClient
         /// <summary>
         /// Downloads url using POST.
         /// </summary>
-        /// <param name="url"></param>
-        /// <param name="data"></param>
-        /// <param name="cookies"></param>
-        /// <param name="referer"></param>
+        /// <param name="url">Url of webpage</param>
+        /// <param name="data">Post values</param>
+        /// <param name="cookies">Cookies for request. Left null if you don't want to use cookies</param>
+        /// <param name="referer">Referer for request.</param>
+        /// <exception cref="WebPageNotFoundException">Page has returned 404 not found</exception>
         /// <returns></returns>
         public byte[] DownloadBytes(string url, NameValueCollection data, string requiredString = null, CookieContainer cookies = null, string referer = null)
         {
@@ -257,6 +271,7 @@ namespace BetterHttpClient
         /// </summary>
         /// <param name="url"></param>
         /// <returns></returns>
+        /// <exception cref="WebPageNotFoundException">Page has returned 404 not found</exception>
         public byte[] DownloadBytes(string url, string requiredString = null, CookieContainer cookies = null, string referer = null)
         {
             return DownloadBytes(url, null, requiredString, cookies, referer);
@@ -355,6 +370,23 @@ namespace BetterHttpClient
             };
 
             return client;
+        }
+        private static IEnumerable<Proxy> ParseProxies(IEnumerable<string> proxies)
+        {
+            IEnumerable<Proxy> proxyParsed = proxies.Select(t =>
+            {
+                try
+                {
+                    Proxy proxy = new Proxy(t);
+                    return proxy;
+                }
+                catch (UriFormatException)
+                {
+                    // parsing exception
+                    return null;
+                }
+            }).Where(t => t != null);
+            return proxyParsed;
         }
     }
 
