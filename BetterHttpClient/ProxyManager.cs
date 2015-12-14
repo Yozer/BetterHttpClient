@@ -14,7 +14,6 @@ namespace BetterHttpClient
     {
         private List<Proxy> _proxies = new List<Proxy>();
         private string _requiredString = string.Empty;
-        private CookieContainer _cookies = new CookieContainer();
         private int _numberOfAttemptsPerRequest;
         private TimeSpan _timeout = TimeSpan.FromSeconds(10);
         private int _numberOfAttempts = 4;
@@ -115,10 +114,6 @@ namespace BetterHttpClient
                 _proxyJudgeService.NumberOfAttempts = _numberOfAttempts;
             }
         }
-        /// <summary>
-        /// If true cookies are preserved between diffrent requests.
-        /// </summary>
-        public bool PreserveCookies { get; set; } = false;
 
         public ProxyManager(IEnumerable<string> proxies, bool anonymousOnly, ProxyJudgeService proxyJudgeService)
         {
@@ -150,19 +145,27 @@ namespace BetterHttpClient
         /// Downloads url using GET.
         /// </summary>
         /// <param name="url"></param>
+        /// <param name="cookies"></param>
+        /// <param name="referer"></param>
         /// <returns></returns>
-        public string GetPage(string url)
+        public string GetPage(string url, string requiredString = null, CookieContainer cookies = null, string referer = null)
         {
-            return PostPage(url, null);
+            return PostPage(url, null, requiredString, cookies, referer);
         }
-       /// <summary>
-       /// Downloads url using POST.
-       /// </summary>
-       /// <param name="url"></param>
-       /// <param name="data"></param>
-       /// <returns></returns>
-        public string PostPage(string url, NameValueCollection data)
+
+        /// <summary>
+        /// Downloads url using POST.
+        /// </summary>
+        /// <param name="url"></param>
+        /// <param name="data"></param>
+        /// <param name="cookies"></param>
+        /// <param name="referer"></param>
+        /// <returns></returns>
+        public string PostPage(string url, NameValueCollection data, string requiredString = null, CookieContainer cookies = null, string referer = null)
         {
+            if (requiredString == null)
+                requiredString = RequiredString;
+
             string page = null;
             int limit = 0;
 
@@ -180,12 +183,12 @@ namespace BetterHttpClient
                         }
                     }
 
-                    var bytes = DownloadBytes(url, data, proxy);
+                    var bytes = DownloadBytes(url, data, proxy, requiredString, cookies, referer);
 
                     if (bytes != null)
                     {
                         page = Encoding.GetString(bytes);
-                        if (!page.Contains(RequiredString))
+                        if (!page.Contains(requiredString))
                         {
                             proxy.IsOnline = false;
                         }
@@ -206,13 +209,16 @@ namespace BetterHttpClient
 
             throw new AllProxiesBannedException();
         }
+
         /// <summary>
         /// Downloads url using POST.
         /// </summary>
         /// <param name="url"></param>
         /// <param name="data"></param>
+        /// <param name="cookies"></param>
+        /// <param name="referer"></param>
         /// <returns></returns>
-        public byte[] DownloadBytes(string url, NameValueCollection data)
+        public byte[] DownloadBytes(string url, NameValueCollection data, string requiredString = null, CookieContainer cookies = null, string referer = null)
         {
             int limit = 0;
 
@@ -227,7 +233,7 @@ namespace BetterHttpClient
                         continue;
                     }
 
-                    byte[] result = DownloadBytes(url, data, proxy);
+                    byte[] result = DownloadBytes(url, data, proxy, requiredString, cookies, referer);
 
                     if (result != null)
                     {
@@ -251,9 +257,9 @@ namespace BetterHttpClient
         /// </summary>
         /// <param name="url"></param>
         /// <returns></returns>
-        public byte[] DownloadBytes(string url)
+        public byte[] DownloadBytes(string url, string requiredString = null, CookieContainer cookies = null, string referer = null)
         {
-            return DownloadBytes(url, null);
+            return DownloadBytes(url, null, requiredString, cookies, referer);
         }
         /// <summary>
         /// Returns first free (but busy) and working proxy.
@@ -294,18 +300,42 @@ namespace BetterHttpClient
             }
         }
 
-
-        private byte[] DownloadBytes(string url, NameValueCollection data, Proxy proxy)
+        /// <summary>
+        /// Return all proxies
+        /// </summary>
+        /// <returns></returns>
+        public List<Proxy> GetAllProxies()
         {
+            lock(_proxies)
+                return CloneProxyList(_proxies);
+        }
+
+
+        private List<Proxy> CloneProxyList(List<Proxy> proxyInput)
+        {
+            List<Proxy> proxies = new List<Proxy>(proxyInput.Count);
+            proxies.AddRange(proxyInput.Select(proxy => (Proxy) proxy.Clone()));
+            return proxies;
+        } 
+
+        private byte[] DownloadBytes(string url, NameValueCollection data, Proxy proxy, string requiredString = null, CookieContainer cookies = null, string referer = null)
+        {
+            if (requiredString == null)
+                requiredString = RequiredString;
+
             HttpClient client = CreateHttpClient();
             client.Proxy = proxy;
+            if (cookies != null) client.Cookies = cookies;
+            if (referer != null) client.Referer = referer;
 
             try
             {
                 return client.DownloadBytes(url, data);
             }
-            catch (WebException)
+            catch (WebException e)
             {
+                if (e.Response != null && (e.Response as HttpWebResponse).StatusCode == HttpStatusCode.NotFound)
+                    throw new WebPageNotFoundException();
                 proxy.IsOnline = false;
             }
 
@@ -324,13 +354,14 @@ namespace BetterHttpClient
                 Timeout = Timeout
             };
 
-            if (PreserveCookies)
-                client.Cookies = _cookies;
             return client;
         }
     }
 
     public class AllProxiesBannedException : Exception
+    {
+    }
+    public class WebPageNotFoundException : Exception
     {
     }
 }

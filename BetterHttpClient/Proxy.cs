@@ -1,9 +1,10 @@
+using System;
 using System.Net;
 using BetterHttpClient.CheckService;
 
 namespace BetterHttpClient
 {
-    public class Proxy
+    public class Proxy : ICloneable
     {
         private volatile bool _isBusy = false;
         private bool _isAnonymous;
@@ -21,7 +22,7 @@ namespace BetterHttpClient
 
         public bool IsOnline { get; set; } = true;
         public ProxyTypeEnum ProxyType { get; internal set; }
-        internal WebProxy ProxyItem { get; }
+        internal WebProxy ProxyItem { get; set; }
 
         public Proxy()
         {
@@ -51,6 +52,20 @@ namespace BetterHttpClient
             _isChecked = true;
             IsOnline = _isAnonymous;
             return _isAnonymous;
+        }
+
+        public object Clone()
+        {
+            var proxy = new Proxy
+            {
+                _isAnonymous = _isAnonymous,
+                _isBusy = _isBusy,
+                _isChecked = _isChecked,
+                IsOnline = IsOnline,
+                ProxyItem = ProxyItem,
+                ProxyType = ProxyType
+            };
+            return proxy;
         }
     }
 
