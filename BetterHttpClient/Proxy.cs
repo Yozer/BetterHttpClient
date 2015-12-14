@@ -39,6 +39,12 @@ namespace BetterHttpClient
             ProxyItem = new WebProxy(ip, port);
         }
 
+        public Proxy(string ip, int port, ProxyTypeEnum proxyType)
+        {
+            ProxyItem = new WebProxy(ip, port);
+            ProxyType = proxyType;
+        }
+
         /// <summary>
         /// Returns true if proxy can hide your ip address
         /// </summary>
