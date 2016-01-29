@@ -7,16 +7,18 @@ using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading.Tasks;
+using BetterHttpClient.Socks.Extensions;
 
 namespace BetterHttpClient.Socks
 {
     internal class SocksHttpWebRequest : WebRequest
     {
-        private static readonly StringCollection validHttpVerbs = new StringCollection {"GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "OPTIONS"};
+        private static readonly StringCollection validHttpVerbs = new StringCollection { "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "OPTIONS" };
         private WebHeaderCollection _HttpRequestHeaders;
         private string _method;
         private byte[] _requestContentBuffer;
-        private string _requestMessage;
+        private NeverEndingStream _requestContentStream;
         private SocksHttpWebResponse _response;
 
         private SocksHttpWebRequest(Uri requestUri)
@@ -42,6 +44,44 @@ namespace BetterHttpClient.Socks
         {
             get { return _HttpRequestHeaders["Accept"]; }
             set { SetSpecialHeaders("Accept", value ?? string.Empty); }
+        }
+
+        public DecompressionMethods AutomaticDecompression
+        {
+            get
+            {
+                var result = DecompressionMethods.None;
+                string encoding = _HttpRequestHeaders["Accept-Encoding"] ?? string.Empty;
+                foreach (string value in encoding.Split(','))
+                {
+                    switch (value.Trim())
+                    {
+                        case "gzip":
+                            result |= DecompressionMethods.GZip;
+                            break;
+
+                        case "deflate":
+                            result |= DecompressionMethods.Deflate;
+                            break;
+                    }
+                }
+
+                return result;
+            }
+            set
+            {
+                string result = string.Empty;
+                if ((value & DecompressionMethods.GZip) != 0)
+                    result = "gzip";
+                if ((value & DecompressionMethods.Deflate) != 0)
+                {
+                    if (!string.IsNullOrEmpty(result))
+                        result += ", ";
+                    result += "deflate";
+                }
+
+                SetSpecialHeaders("Accept-Encoding", result);
+            }
         }
 
         public override Uri RequestUri { get; }
@@ -83,18 +123,6 @@ namespace BetterHttpClient.Socks
 
         public override string ContentType { get; set; }
 
-        public string RequestMessage
-        {
-            get
-            {
-                if (string.IsNullOrEmpty(_requestMessage))
-                {
-                    _requestMessage = BuildHttpRequestMessage();
-                }
-                return _requestMessage;
-            }
-        }
-
         public override WebResponse GetResponse()
         {
             if (Proxy == null)
@@ -124,6 +152,12 @@ namespace BetterHttpClient.Socks
 
             if (_requestContentBuffer == null)
             {
+                if (ContentLength == 0)
+                {
+                    _requestContentStream = new NeverEndingStream();
+                    return _requestContentStream;
+                }
+
                 _requestContentBuffer = new byte[ContentLength];
             }
             else if (ContentLength == default(long))
@@ -132,11 +166,52 @@ namespace BetterHttpClient.Socks
             }
             else if (_requestContentBuffer.Length != ContentLength)
             {
-                Array.Resize(ref _requestContentBuffer, (int) ContentLength);
+                Array.Resize(ref _requestContentBuffer, (int)ContentLength);
             }
             return new MemoryStream(_requestContentBuffer);
         }
 
+        public override IAsyncResult BeginGetResponse(AsyncCallback callback, object state)
+        {
+            if (Proxy == null)
+            {
+                throw new InvalidOperationException("Proxy property cannot be null.");
+            }
+            if (string.IsNullOrEmpty(Method))
+            {
+                throw new InvalidOperationException("Method has not been set.");
+            }
+
+            var task = Task.Run<WebResponse>(() =>
+            {
+                if (RequestSubmitted)
+                {
+                    return _response;
+                }
+                _response = InternalGetResponse();
+                RequestSubmitted = true;
+                return _response;
+            });
+
+            return task.AsApm(callback, state);
+        }
+
+        public override WebResponse EndGetResponse(IAsyncResult asyncResult)
+        {
+            var task = asyncResult as Task<WebResponse>;
+
+            try
+            {
+                return task.Result;
+            }
+            catch (AggregateException ex)
+            {
+                if (ex.InnerException is IOException || ex.InnerException is System.Net.Sockets.SocketException)
+                    throw new WebException("Proxy error " + ex.InnerException.Message, ex.InnerException, WebExceptionStatus.ConnectFailure,
+                        SocksHttpWebResponse.CreateErrorResponse(HttpStatusCode.GatewayTimeout));
+                throw ex.InnerException;
+            }
+        }
 
         public new static WebRequest Create(string requestUri)
         {
@@ -157,20 +232,34 @@ namespace BetterHttpClient.Socks
             }
         }
 
-        private string BuildHttpRequestMessage()
+        private string BuildHttpRequestMessage(Uri requestUri)
         {
             if (RequestSubmitted)
             {
                 throw new InvalidOperationException("This operation cannot be performed after the request has been submitted.");
             }
 
+            // See if we have a stream instead of byte array
+            if (_requestContentBuffer == null && _requestContentStream != null)
+            {
+                _requestContentBuffer = _requestContentStream.ToArray();
+                _requestContentStream.ForceClose();
+                _requestContentStream.Dispose();
+                _requestContentStream = null;
+                ContentLength = _requestContentBuffer.Length;
+            }
+
             var message = new StringBuilder();
-            message.AppendFormat("{0} {1} HTTP/1.0\r\nHost: {2}\r\n", Method, RequestUri.PathAndQuery, RequestUri.Host);
+            message.AppendFormat("{0} {1} HTTP/1.1\r\nHost: {2}\r\n", Method, requestUri, requestUri.Host);
+
+            Headers.Set(HttpRequestHeader.Connection, "close");
 
             // add the headers
             foreach (var key in Headers.Keys)
             {
-                message.AppendFormat("{0}: {1}\r\n", key, Headers[key.ToString()]);
+                string value = Headers[key.ToString()];
+                if (!string.IsNullOrEmpty(value))
+                    message.AppendFormat("{0}: {1}\r\n", key, value);
             }
 
             if (!string.IsNullOrEmpty(ContentType))
@@ -196,128 +285,171 @@ namespace BetterHttpClient.Socks
                     }
                 }
             }
+            else if (_requestContentStream != null)
+            {
+                _requestContentStream.Position = 0;
+
+                using (var reader = new StreamReader(_requestContentStream))
+                {
+                    message.Append(reader.ReadToEnd());
+                }
+
+
+                _requestContentStream.ForceClose();
+                _requestContentStream.Dispose();
+            }
 
             return message.ToString();
         }
 
         private SocksHttpWebResponse InternalGetResponse()
         {
-            var proxyUri = Proxy.GetProxy(RequestUri);
-            var ipAddress = GetProxyIpAddress(proxyUri);
-            var response = new List<byte>();
+            Uri requestUri = RequestUri;
 
-            using (var client = new TcpClient(ipAddress.ToString(), proxyUri.Port))
+            int redirects = 0;
+            while (redirects++ < 10)
             {
-                client.ReceiveTimeout = Timeout;
-                client.SendTimeout = Timeout;
-                var networkStream = client.GetStream();
-                // auth
-                var buf = new byte[300];
-                buf[0] = 0x05; // Version
-                buf[1] = 0x01; // NMETHODS
-                buf[2] = 0x00; // No auth-method
-                networkStream.Write(buf, 0, 3);
+                // Loop while redirecting
 
-                networkStream.Read(buf, 0, 2);
-                if (buf[0] != 0x05)
+                var proxyUri = Proxy.GetProxy(requestUri);
+                var ipAddress = GetProxyIpAddress(proxyUri);
+                var response = new List<byte>();
+
+                using (var client = new TcpClient(ipAddress.ToString(), proxyUri.Port))
                 {
-                    throw new IOException("Invalid Socks Version");
+                    int timeout = Timeout;
+                    if (timeout == 0)
+                        timeout = 30 * 1000;
+                    client.ReceiveTimeout = timeout;
+                    client.SendTimeout = timeout;
+                    var networkStream = client.GetStream();
+                    // auth
+                    var buf = new byte[300];
+                    buf[0] = 0x05; // Version
+                    buf[1] = 0x01; // NMETHODS
+                    buf[2] = 0x00; // No auth-method
+                    networkStream.Write(buf, 0, 3);
+
+                    networkStream.Read(buf, 0, 2);
+                    if (buf[0] != 0x05)
+                    {
+                        throw new IOException("Invalid Socks Version");
+                    }
+                    if (buf[1] == 0xff)
+                    {
+                        throw new IOException("Socks Server does not support no-auth");
+                    }
+                    if (buf[1] != 0x00)
+                    {
+                        throw new Exception("Socks Server did choose bogus auth");
+                    }
+
+                    // connect
+                    var destIP = Dns.GetHostEntry(requestUri.DnsSafeHost).AddressList[0];
+                    var index = 0;
+                    buf[index++] = 0x05; // version 5 .
+                    buf[index++] = 0x01; // command = connect.
+                    buf[index++] = 0x00; // Reserve = must be 0x00
+
+                    buf[index++] = 0x01; // Address is full-qualified domain name.
+                    var rawBytes = destIP.GetAddressBytes();
+                    rawBytes.CopyTo(buf, index);
+                    index += (ushort)rawBytes.Length;
+
+                    var portBytes = BitConverter.GetBytes(Uri.UriSchemeHttps == requestUri.Scheme ? 443 : 80);
+                    for (var i = portBytes.Length - 3; i >= 0; i--)
+                        buf[index++] = portBytes[i];
+
+
+                    networkStream.Write(buf, 0, index);
+
+                    networkStream.Read(buf, 0, 4);
+                    if (buf[0] != 0x05)
+                    {
+                        throw new IOException("Invalid Socks Version");
+                    }
+                    if (buf[1] != 0x00)
+                    {
+                        throw new IOException($"Socks Error {buf[1]:X}");
+                    }
+
+                    var rdest = string.Empty;
+                    switch (buf[3])
+                    {
+                        case 0x01: // IPv4
+                            networkStream.Read(buf, 0, 4);
+                            var v4 = BitConverter.ToUInt32(buf, 0);
+                            rdest = new IPAddress(v4).ToString();
+                            break;
+                        case 0x03: // Domain name
+                            networkStream.Read(buf, 0, 1);
+                            if (buf[0] == 0xff)
+                            {
+                                throw new IOException("Invalid Domain Name");
+                            }
+                            networkStream.Read(buf, 1, buf[0]);
+                            rdest = Encoding.ASCII.GetString(buf, 1, buf[0]);
+                            break;
+                        case 0x04: // IPv6
+                            var octets = new byte[16];
+                            networkStream.Read(octets, 0, 16);
+                            rdest = new IPAddress(octets).ToString();
+                            break;
+                        default:
+                            throw new IOException("Invalid Address type");
+                    }
+                    networkStream.Read(buf, 0, 2);
+                    var rport = (ushort)IPAddress.NetworkToHostOrder((short)BitConverter.ToUInt16(buf, 0));
+
+                    Stream readStream = null;
+                    if (Uri.UriSchemeHttps == requestUri.Scheme)
+                    {
+                        var ssl = new SslStream(networkStream);
+                        ssl.AuthenticateAsClient(requestUri.DnsSafeHost);
+                        readStream = ssl;
+                    }
+                    else
+                    {
+                        readStream = networkStream;
+                    }
+
+                    string requestString = BuildHttpRequestMessage(requestUri);
+
+                    var request = Encoding.ASCII.GetBytes(requestString);
+                    readStream.Write(request, 0, request.Length);
+                    readStream.Flush();
+
+                    var buffer = new byte[client.ReceiveBufferSize];
+
+                    var readlen = 0;
+                    do
+                    {
+                        readlen = readStream.Read(buffer, 0, buffer.Length);
+                        response.AddRange(buffer.Take(readlen));
+                    } while (readlen != 0);
+
+                    readStream.Close();
                 }
-                if (buf[1] == 0xff)
+
+                var webResponse = new SocksHttpWebResponse(requestUri, response.ToArray());
+
+                if (webResponse.StatusCode == HttpStatusCode.Moved || webResponse.StatusCode == HttpStatusCode.MovedPermanently)
                 {
-                    throw new IOException("Socks Server does not support no-auth");
-                }
-                if (buf[1] != 0x00)
-                {
-                    throw new Exception("Socks Server did choose bogus auth");
-                }
+                    string redirectUrl = webResponse.Headers["Location"];
+                    if (string.IsNullOrEmpty(redirectUrl))
+                        throw new WebException("Missing location for redirect");
 
-                // connect
-                var destIP = Dns.GetHostEntry(RequestUri.DnsSafeHost).AddressList[0];
-                var index = 0;
-                buf[index++] = 0x05; // version 5 .
-                buf[index++] = 0x01; // command = connect.
-                buf[index++] = 0x00; // Reserve = must be 0x00
-
-                buf[index++] = 0x01; // Address is full-qualified domain name.
-                var rawBytes = destIP.GetAddressBytes();
-                rawBytes.CopyTo(buf, index);
-                index += (ushort) rawBytes.Length;
-
-                var portBytes = BitConverter.GetBytes(Uri.UriSchemeHttps == RequestUri.Scheme ? 443 : 80);
-                for (var i = portBytes.Length - 3; i >= 0; i--)
-                    buf[index++] = portBytes[i];
-
-
-                networkStream.Write(buf, 0, index);
-
-                networkStream.Read(buf, 0, 4);
-                if (buf[0] != 0x05)
-                {
-                    throw new IOException("Invalid Socks Version");
-                }
-                if (buf[1] != 0x00)
-                {
-                    throw new IOException($"Socks Error {buf[1]:X}");
+                    requestUri = new Uri(requestUri, redirectUrl);
+                    continue;
                 }
 
-                var rdest = string.Empty;
-                switch (buf[3])
-                {
-                    case 0x01: // IPv4
-                        networkStream.Read(buf, 0, 4);
-                        var v4 = BitConverter.ToUInt32(buf, 0);
-                        rdest = new IPAddress(v4).ToString();
-                        break;
-                    case 0x03: // Domain name
-                        networkStream.Read(buf, 0, 1);
-                        if (buf[0] == 0xff)
-                        {
-                            throw new IOException("Invalid Domain Name");
-                        }
-                        networkStream.Read(buf, 1, buf[0]);
-                        rdest = Encoding.ASCII.GetString(buf, 1, buf[0]);
-                        break;
-                    case 0x04: // IPv6
-                        var octets = new byte[16];
-                        networkStream.Read(octets, 0, 16);
-                        rdest = new IPAddress(octets).ToString();
-                        break;
-                    default:
-                        throw new IOException("Invalid Address type");
-                }
-                networkStream.Read(buf, 0, 2);
-                var rport = (ushort) IPAddress.NetworkToHostOrder((short) BitConverter.ToUInt16(buf, 0));
+                if ((int)webResponse.StatusCode < 200 || (int)webResponse.StatusCode > 299)
+                    throw new WebException(webResponse.StatusDescription, null, WebExceptionStatus.UnknownError, webResponse);
 
-                Stream readStream = null;
-                if (Uri.UriSchemeHttps == RequestUri.Scheme)
-                {
-                    var ssl = new SslStream(networkStream);
-                    ssl.AuthenticateAsClient(RequestUri.DnsSafeHost);
-                    readStream = ssl;
-                }
-                else
-                {
-                    readStream = networkStream;
-                }
-
-                var request = Encoding.ASCII.GetBytes(RequestMessage);
-                readStream.Write(request, 0, request.Length);
-                readStream.Flush();
-
-                var buffer = new byte[client.ReceiveBufferSize];
-
-                var readlen = 0;
-                do
-                {
-                    readlen = readStream.Read(buffer, 0, buffer.Length);
-                    response.AddRange(buffer.Take(readlen));
-                } while (readlen != 0);
-
-                readStream.Close();
+                return webResponse;
             }
 
-            return new SocksHttpWebResponse(response.ToArray());
+            throw new WebException("Too many redirects", null, WebExceptionStatus.ProtocolError, SocksHttpWebResponse.CreateErrorResponse(HttpStatusCode.BadRequest));
         }
 
         private static IPAddress GetProxyIpAddress(Uri proxyUri)
