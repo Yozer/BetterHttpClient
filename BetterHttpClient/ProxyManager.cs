@@ -157,7 +157,7 @@ namespace BetterHttpClient
         /// </summary>
         /// <param name="url">Url of webpage</param>
         /// <param name="cookies">Cookies for request. Left null if you don't want to use cookies</param>
-        /// <param name="referer">Referer for request.</param>
+        /// <param name="customHeaders">Specify custom headers for this request</param>
         /// <returns></returns>
         /// <exception cref="WebPageNotFoundException">Page has returned 404 not found</exception>
         public string GetPage(string url, string requiredString = null, CookieContainer cookies = null, NameValueCollection customHeaders = null)
@@ -171,7 +171,7 @@ namespace BetterHttpClient
         /// <param name="url">Url of webpage</param>
         /// <param name="data">Post values</param>
         /// <param name="cookies">Cookies for request. Left null if you don't want to use cookies</param>
-        /// <param name="referer">Referer for request.</param>
+        /// <param name="customHeaders">Specify custom headers for this request</param>
         /// <exception cref="WebPageNotFoundException">Page has returned 404 not found</exception>
         /// <returns></returns>
         public string PostPage(string url, NameValueCollection data, string requiredString = null, CookieContainer cookies = null, NameValueCollection customHeaders = null)
@@ -229,7 +229,7 @@ namespace BetterHttpClient
         /// <param name="url">Url of webpage</param>
         /// <param name="data">Post values</param>
         /// <param name="cookies">Cookies for request. Left null if you don't want to use cookies</param>
-        /// <param name="referer">Referer for request.</param>
+        /// <param name="customHeaders">Specify custom headers for this request</param>
         /// <exception cref="WebPageNotFoundException">Page has returned 404 not found</exception>
         /// <returns></returns>
         public byte[] DownloadBytes(string url, NameValueCollection data, CookieContainer cookies = null, NameValueCollection customHeaders = null)
@@ -270,6 +270,8 @@ namespace BetterHttpClient
         /// Downloads url using GET.
         /// </summary>
         /// <param name="url"></param>
+        /// <param name="cookies"></param>
+        /// <param name="customHeaders">Specify custom headers for this request</param>
         /// <returns></returns>
         /// <exception cref="WebPageNotFoundException">Page has returned 404 not found</exception>
         public byte[] DownloadBytes(string url, CookieContainer cookies = null, NameValueCollection customHeaders = null)

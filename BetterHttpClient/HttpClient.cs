@@ -98,6 +98,9 @@ namespace BetterHttpClient
 
         private string _location = null;
 
+        /// <summary>
+        /// Headers collection that will be added to each request
+        /// </summary>
         public NameValueCollection CustomHeaders { get; set; }
         public HttpClient(Proxy proxy) : this(proxy, Encoding.UTF8) { }
 
