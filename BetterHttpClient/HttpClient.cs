@@ -95,8 +95,10 @@ namespace BetterHttpClient
             get { return base.Encoding; }
             set { base.Encoding = value; }
         }
-
-        private string _location = null;
+        /// <summary>
+        /// Enabled automatic redirect. Default: true
+        /// </summary>
+        public bool AllowAutoRedirect { get; set; } = true;
 
         /// <summary>
         /// Headers collection that will be added to each request
@@ -148,7 +150,7 @@ namespace BetterHttpClient
                 httpRequest.Accept = Accept;
                 httpRequest.Referer = Referer;
                 httpRequest.AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip;
-                httpRequest.AllowAutoRedirect = false;
+                httpRequest.AllowAutoRedirect = AllowAutoRedirect;
             }
             else if (Proxy.ProxyType == ProxyTypeEnum.Socks)
             {
@@ -156,9 +158,10 @@ namespace BetterHttpClient
                 socksRequest.UserAgent = UserAgent;
                 socksRequest.Accept = Accept;
                 socksRequest.Referer = Referer;
+                socksRequest.AllowAutoRedirect = AllowAutoRedirect;
             }
 
-            request.Timeout = (int)Timeout.TotalMilliseconds;
+            request.Timeout = (int) Timeout.TotalMilliseconds;
             request.Proxy = Proxy.ProxyItem;
 
             return request;
@@ -167,10 +170,6 @@ namespace BetterHttpClient
         protected override WebResponse GetWebResponse(WebRequest request)
         {
             var response = base.GetWebResponse(request);
-            if (response.Headers["Location"] != null)
-            {
-                _location = request.RequestUri.Scheme + "://" + request.RequestUri.Host + (response.Headers["Location"].StartsWith("/") ? "" : "/") + response.Headers["Location"];
-            }
             try
             {
                 string setCookies = response.Headers["Set-Cookie"];
@@ -234,12 +233,6 @@ namespace BetterHttpClient
                         Proxy.ProxyType = ProxyTypeEnum.Socks;
 
                     byte[] result = data == null ? Encoding.GetBytes(DownloadString(url)) : UploadValues(url, data);
-                    if (_location != null)
-                    {
-                        string loc = _location;
-                        _location = null;
-                        return DownloadBytes(loc, null);
-                    }
                     return result;
                 }
                 catch (WebException e)

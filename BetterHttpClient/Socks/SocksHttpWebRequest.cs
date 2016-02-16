@@ -122,6 +122,7 @@ namespace BetterHttpClient.Socks
         public override long ContentLength { get; set; }
 
         public override string ContentType { get; set; }
+        public bool AllowAutoRedirect { get; set; } = true;
 
         public override WebResponse GetResponse()
         {
@@ -307,7 +308,8 @@ namespace BetterHttpClient.Socks
             Uri requestUri = RequestUri;
 
             int redirects = 0;
-            while (redirects++ < 10)
+            const int maxAutoredirectCount = 10;
+            while (redirects++ < maxAutoredirectCount)
             {
                 // Loop while redirecting
 
@@ -440,7 +442,11 @@ namespace BetterHttpClient.Socks
                         throw new WebException("Missing location for redirect");
 
                     requestUri = new Uri(requestUri, redirectUrl);
-                    continue;
+                    if (AllowAutoRedirect)
+                    {
+                        continue;
+                    }
+                    return webResponse;
                 }
 
                 if ((int)webResponse.StatusCode < 200 || (int)webResponse.StatusCode > 299)
