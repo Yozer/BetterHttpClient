@@ -15,7 +15,7 @@ namespace BetterHttpClient
         /// <summary>
         /// Cookie container.
         /// </summary>
-        public CookieContainer Cookies { get; internal set; } = new CookieContainer();
+        public CookieContainer Cookies { get; set; } = new CookieContainer();
 
         /// <summary>
         /// Proxy which should be used for request.
@@ -39,7 +39,7 @@ namespace BetterHttpClient
             }
             set
             {
-                if(value.TotalMilliseconds < 5)
+                if (value.TotalMilliseconds < 5)
                     throw new ArgumentOutOfRangeException("Timeout has to be greater or equal than 5 milliseconds.");
                 _timeout = value;
             }
@@ -54,7 +54,7 @@ namespace BetterHttpClient
             get { return _numberOfAttempts; }
             set
             {
-                if(value < 1)
+                if (value < 1)
                     throw new ArgumentOutOfRangeException("Value has to be greater than one.");
 
                 _numberOfAttempts = value;
@@ -95,9 +95,13 @@ namespace BetterHttpClient
             get { return base.Encoding; }
             set { base.Encoding = value; }
         }
-        public HttpClient(Proxy proxy) : this(proxy, Encoding.UTF8) {  }
 
-        public HttpClient() : this(new Proxy(), Encoding.UTF8) {  }
+        private string _location = null;
+
+        public NameValueCollection CustomHeaders { get; set; }
+        public HttpClient(Proxy proxy) : this(proxy, Encoding.UTF8) { }
+
+        public HttpClient() : this(new Proxy(), Encoding.UTF8) { }
         public HttpClient(Encoding encoding) : this(new Proxy(), encoding) { }
         public HttpClient(Proxy proxy, Encoding encoding)
         {
@@ -121,9 +125,17 @@ namespace BetterHttpClient
                 request.ContentType = base.GetWebRequest(address).ContentType;
             }
 
+
             request.Headers.Add("Cookie", Cookies.GetCookieHeader(address));
             request.Headers.Add("Accept-Language", AcceptLanguage);
             request.Headers.Add("Accept-Encoding", AcceptEncoding);
+            if (CustomHeaders != null)
+            {
+                foreach (string key in CustomHeaders.AllKeys)
+                {
+                    request.Headers.Add(key, CustomHeaders[key]);
+                }
+            }
 
 
             if (Proxy.ProxyType != ProxyTypeEnum.Socks)
@@ -133,8 +145,9 @@ namespace BetterHttpClient
                 httpRequest.Accept = Accept;
                 httpRequest.Referer = Referer;
                 httpRequest.AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip;
+                httpRequest.AllowAutoRedirect = false;
             }
-            else if(Proxy.ProxyType == ProxyTypeEnum.Socks)
+            else if (Proxy.ProxyType == ProxyTypeEnum.Socks)
             {
                 var socksRequest = (request as SocksHttpWebRequest);
                 socksRequest.UserAgent = UserAgent;
@@ -142,15 +155,19 @@ namespace BetterHttpClient
                 socksRequest.Referer = Referer;
             }
 
-            request.Timeout = (int) Timeout.TotalMilliseconds;
+            request.Timeout = (int)Timeout.TotalMilliseconds;
             request.Proxy = Proxy.ProxyItem;
-            
+
             return request;
         }
 
         protected override WebResponse GetWebResponse(WebRequest request)
         {
             var response = base.GetWebResponse(request);
+            if (response.Headers["Location"] != null)
+            {
+                _location = request.RequestUri.Scheme + "://" + request.RequestUri.Host + (response.Headers["Location"].StartsWith("/") ? "" : "/") + response.Headers["Location"];
+            }
             try
             {
                 string setCookies = response.Headers["Set-Cookie"];
@@ -208,12 +225,18 @@ namespace BetterHttpClient
             {
                 try
                 {
-                    if(unkownProxy && counter % 2 == 0) // every odd try is as http proxy
+                    if (unkownProxy && counter % 2 == 0) // every odd try is as http proxy
                         Proxy.ProxyType = ProxyTypeEnum.Http;
-                    else if(unkownProxy)
+                    else if (unkownProxy)
                         Proxy.ProxyType = ProxyTypeEnum.Socks;
 
                     byte[] result = data == null ? Encoding.GetBytes(DownloadString(url)) : UploadValues(url, data);
+                    if (_location != null)
+                    {
+                        string loc = _location;
+                        _location = null;
+                        return DownloadBytes(loc, null);
+                    }
                     return result;
                 }
                 catch (WebException e)
@@ -229,6 +252,4 @@ namespace BetterHttpClient
             throw lastWebException;
         }
     }
-
-
 }

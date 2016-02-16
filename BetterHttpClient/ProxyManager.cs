@@ -160,9 +160,9 @@ namespace BetterHttpClient
         /// <param name="referer">Referer for request.</param>
         /// <returns></returns>
         /// <exception cref="WebPageNotFoundException">Page has returned 404 not found</exception>
-        public string GetPage(string url, string requiredString = null, CookieContainer cookies = null, string referer = null)
+        public string GetPage(string url, string requiredString = null, CookieContainer cookies = null, NameValueCollection customHeaders = null)
         {
-            return PostPage(url, null, requiredString, cookies, referer);
+            return PostPage(url, null, requiredString, cookies, customHeaders);
         }
 
         /// <summary>
@@ -174,7 +174,7 @@ namespace BetterHttpClient
         /// <param name="referer">Referer for request.</param>
         /// <exception cref="WebPageNotFoundException">Page has returned 404 not found</exception>
         /// <returns></returns>
-        public string PostPage(string url, NameValueCollection data, string requiredString = null, CookieContainer cookies = null, string referer = null)
+        public string PostPage(string url, NameValueCollection data, string requiredString = null, CookieContainer cookies = null, NameValueCollection customHeaders = null)
         {
             if (requiredString == null)
                 requiredString = RequiredString;
@@ -196,7 +196,7 @@ namespace BetterHttpClient
                         }
                     }
 
-                    var bytes = DownloadBytes(url, data, proxy, requiredString, cookies, referer);
+                    var bytes = DownloadBytes(url, data, proxy, cookies, customHeaders);
 
                     if (bytes != null)
                     {
@@ -232,7 +232,7 @@ namespace BetterHttpClient
         /// <param name="referer">Referer for request.</param>
         /// <exception cref="WebPageNotFoundException">Page has returned 404 not found</exception>
         /// <returns></returns>
-        public byte[] DownloadBytes(string url, NameValueCollection data, string requiredString = null, CookieContainer cookies = null, string referer = null)
+        public byte[] DownloadBytes(string url, NameValueCollection data, CookieContainer cookies = null, NameValueCollection customHeaders = null)
         {
             int limit = 0;
 
@@ -247,7 +247,7 @@ namespace BetterHttpClient
                         continue;
                     }
 
-                    byte[] result = DownloadBytes(url, data, proxy, requiredString, cookies, referer);
+                    byte[] result = DownloadBytes(url, data, proxy, cookies, customHeaders);
 
                     if (result != null)
                     {
@@ -272,9 +272,9 @@ namespace BetterHttpClient
         /// <param name="url"></param>
         /// <returns></returns>
         /// <exception cref="WebPageNotFoundException">Page has returned 404 not found</exception>
-        public byte[] DownloadBytes(string url, string requiredString = null, CookieContainer cookies = null, string referer = null)
+        public byte[] DownloadBytes(string url, CookieContainer cookies = null, NameValueCollection customHeaders = null)
         {
-            return DownloadBytes(url, null, requiredString, cookies, referer);
+            return DownloadBytes(url, null, cookies, customHeaders);
         }
         /// <summary>
         /// Returns first free (but busy) and working proxy.
@@ -333,15 +333,11 @@ namespace BetterHttpClient
             return proxies;
         } 
 
-        private byte[] DownloadBytes(string url, NameValueCollection data, Proxy proxy, string requiredString = null, CookieContainer cookies = null, string referer = null)
+        private byte[] DownloadBytes(string url, NameValueCollection data, Proxy proxy, CookieContainer cookies = null, NameValueCollection customHeaders = null)
         {
-            if (requiredString == null)
-                requiredString = RequiredString;
-
-            HttpClient client = CreateHttpClient();
+            HttpClient client = CreateHttpClient(customHeaders);
             client.Proxy = proxy;
             if (cookies != null) client.Cookies = cookies;
-            if (referer != null) client.Referer = referer;
 
             try
             {
@@ -356,7 +352,7 @@ namespace BetterHttpClient
 
             return null;
         }
-        private HttpClient CreateHttpClient()
+        private HttpClient CreateHttpClient(NameValueCollection customHeaders = null)
         {
             HttpClient client = new HttpClient(Encoding)
             {
@@ -368,6 +364,37 @@ namespace BetterHttpClient
                 Referer = Referer,
                 Timeout = Timeout
             };
+
+            if (customHeaders != null)
+            {
+                if (customHeaders.AllKeys.Contains("Accept"))
+                {
+                    client.Accept = customHeaders["Accept"];
+                    customHeaders.Remove("Accept");
+                }
+                if (customHeaders.AllKeys.Contains("Accept-Encoding"))
+                {
+                    client.AcceptEncoding = customHeaders["Accept-Encoding"];
+                    customHeaders.Remove("Accept-Encoding");
+                }
+                if (customHeaders.AllKeys.Contains("Accept-Language"))
+                {
+                    client.AcceptLanguage = customHeaders["Accept-Language"];
+                    customHeaders.Remove("Accept-Language");
+                }
+                if (customHeaders.AllKeys.Contains("User-Agent"))
+                {
+                    client.UserAgent = customHeaders["User-Agente"];
+                    customHeaders.Remove("User-Agent");
+                }
+                if (customHeaders.AllKeys.Contains("Referer"))
+                {
+                    client.Referer = customHeaders["Referer"];
+                    customHeaders.Remove("Referer");
+                }
+
+                client.CustomHeaders = customHeaders;
+            }
 
             return client;
         }
