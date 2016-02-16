@@ -21,7 +21,7 @@ namespace BetterHttpClient
         /// Proxy which should be used for request.
         /// Set null or proxy with type ProxyTypeEnum.None if you want to perform request without proxy.
         /// </summary>
-        public Proxy Proxy
+        public new Proxy Proxy
         {
             get { return _proxy; }
             set { _proxy = value ?? new Proxy(); }

@@ -18,7 +18,7 @@ namespace BetterHttpClient.CheckService
             {
                 page = client.Get("http://proxyjudge.info/");
             }
-            catch (WebException e)
+            catch (WebException)
             {
                 proxy.IsOnline = false;
             }

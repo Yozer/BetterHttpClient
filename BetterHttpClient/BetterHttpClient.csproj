@@ -48,9 +48,11 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Proxy.cs" />
     <Compile Include="ProxyManager.cs" />
+    <Compile Include="Socks\NeverEndingStream.cs" />
     <Compile Include="Socks\SocksHttpWebRequest.cs" />
     <Compile Include="Socks\SocksHttpWebResponse.cs" />
     <Compile Include="CheckService\ProxyJudgeProxyCheckService.cs" />
+    <Compile Include="Socks\TaskExtensions.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
