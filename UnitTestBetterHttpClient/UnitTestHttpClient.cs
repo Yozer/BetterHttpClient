@@ -10,6 +10,8 @@ namespace UnitTestBetterHttpClient
     [TestClass]
     public class UnitTestHttpClient
     {
+        private const string HttpsProxy = "210.245.25.229:3128";
+        private const string Socksproxy = "200.239.9.161:10000";
         [TestMethod]
         public void TestGet()
         {
@@ -90,8 +92,7 @@ namespace UnitTestBetterHttpClient
         [TestMethod]
         public void TestHttpProxy()
         {
-            string proxyAddress = "218.200.66.196:8080";
-            HttpClient client = new HttpClient(new Proxy(proxyAddress))
+            HttpClient client = new HttpClient(new Proxy(HttpsProxy))
             {
                 UserAgent = "Mozilla/5.0 (Windows NT 6.3; WOW64; rv:41.0) Gecko/20100101 Firefox/41.0",
                 Encoding = Encoding.GetEncoding("iso-8859-2"),
@@ -104,8 +105,7 @@ namespace UnitTestBetterHttpClient
         [TestMethod]
         public void TestHttpsProxy()
         {
-            string proxyAddress = "218.200.66.196:8080";
-            HttpClient client = new HttpClient(new Proxy(proxyAddress))
+            HttpClient client = new HttpClient(new Proxy(HttpsProxy))
             {
                 UserAgent = "Mozilla/5.0 (Windows NT 6.3; WOW64; rv:41.0) Gecko/20100101 Firefox/41.0"
             };
@@ -116,8 +116,7 @@ namespace UnitTestBetterHttpClient
         [TestMethod]
         public void TestSocksHttpProxy()
         {
-            string proxyAddress = "202.43.147.226:1080";
-            HttpClient client = new HttpClient(new Proxy(proxyAddress))
+            HttpClient client = new HttpClient(new Proxy(Socksproxy))
             {
                 UserAgent = "Mozilla/5.0 (Windows NT 6.3; WOW64; rv:41.0) Gecko/20100101 Firefox/41.0",
                 Encoding = Encoding.GetEncoding("iso-8859-2"),
@@ -130,8 +129,7 @@ namespace UnitTestBetterHttpClient
         [TestMethod]
         public void TestSocksHttpsProxyDeflateEncoding()
         {
-            string proxyAddress = "202.43.147.226:1080";
-            HttpClient client = new HttpClient(new Proxy(proxyAddress))
+            HttpClient client = new HttpClient(new Proxy(Socksproxy))
             {
                 UserAgent = "Mozilla/5.0 (Windows NT 6.3; WOW64; rv:41.0) Gecko/20100101 Firefox/41.0",
                 AcceptEncoding = "deflate"
@@ -143,8 +141,7 @@ namespace UnitTestBetterHttpClient
         [TestMethod]
         public void TestSocksHttpsProxyGzipEndcoding()
         {
-            string proxyAddress = "202.43.147.226:1080";
-            HttpClient client = new HttpClient(new Proxy(proxyAddress))
+            HttpClient client = new HttpClient(new Proxy(Socksproxy))
             {
                 UserAgent = "Mozilla/5.0 (Windows NT 6.3; WOW64; rv:41.0) Gecko/20100101 Firefox/41.0",
                 AcceptEncoding = "gzip"
