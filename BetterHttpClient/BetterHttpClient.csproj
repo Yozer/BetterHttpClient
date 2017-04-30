@@ -41,6 +41,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Exceptions\BetterWebException.cs" />
     <Compile Include="HttpClient.cs">
       <SubType>Component</SubType>
     </Compile>
