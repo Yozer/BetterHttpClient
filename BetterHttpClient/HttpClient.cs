@@ -104,12 +104,20 @@ namespace BetterHttpClient
         /// Headers collection that will be added to each request
         /// </summary>
         public NameValueCollection CustomHeaders { get; set; }
+
+        /// <summary>
+        /// Necessary to ignore errors of the protocol and not to generate exceptions
+        /// </summary>
+        public bool IgnoreProtocolErrors { get; set; } = false;
+
+
         public HttpClient(Proxy proxy) : this(proxy, Encoding.UTF8) { }
 
         public HttpClient() : this(new Proxy(), Encoding.UTF8) { }
         public HttpClient(Encoding encoding) : this(new Proxy(), encoding) { }
         public HttpClient(Proxy proxy, Encoding encoding)
         {
+
             Encoding = encoding;
             Proxy = proxy;
         }
@@ -161,7 +169,7 @@ namespace BetterHttpClient
                 socksRequest.AllowAutoRedirect = AllowAutoRedirect;
             }
 
-            request.Timeout = (int) Timeout.TotalMilliseconds;
+            request.Timeout = (int)Timeout.TotalMilliseconds;
             request.Proxy = Proxy.ProxyItem;
 
             return request;
@@ -170,6 +178,7 @@ namespace BetterHttpClient
         protected override WebResponse GetWebResponse(WebRequest request)
         {
             var response = base.GetWebResponse(request);
+
             try
             {
                 string setCookies = response.Headers["Set-Cookie"];
@@ -220,7 +229,7 @@ namespace BetterHttpClient
         public byte[] DownloadBytes(string url, NameValueCollection data)
         {
             int counter = 0;
-            WebException lastWebException = null;
+            BetterWebException lastWebException = null;
             bool unkownProxy = Proxy.ProxyType == ProxyTypeEnum.Unknown;
 
             while (counter < NumberOfAttempts + (NumberOfAttempts < 2 && unkownProxy ? 1 : 0)) // min two try for unkonwn proxy type
@@ -237,13 +246,21 @@ namespace BetterHttpClient
                 }
                 catch (WebException e)
                 {
-                    lastWebException = e;
+                    lastWebException = new BetterWebException(e);
                     counter++;
                 }
             }
 
             if (unkownProxy)
                 Proxy.ProxyType = ProxyTypeEnum.Unknown;
+
+
+            if (IgnoreProtocolErrors)
+            {
+                string content = lastWebException.Content ?? string.Empty;
+                return Encoding.GetBytes(content);
+            }
+
             // ReSharper disable once PossibleNullReferenceException
             throw lastWebException;
         }
