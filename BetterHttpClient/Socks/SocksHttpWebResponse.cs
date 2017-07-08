@@ -62,12 +62,12 @@ namespace BetterHttpClient.Socks
             if (string.IsNullOrEmpty(headers))
                 return;
 
-            var headerValues = headers.Split(new[] { "\r\n" }, StringSplitOptions.RemoveEmptyEntries);
+            var headerValues = headers.Split(new char[] { '\r','\n' }, StringSplitOptions.RemoveEmptyEntries); // some website may mix \r\n and \n only, this will raise an useless error on Headers.Add, so splitting separate char seems best idea
             // ignore the first line in the header since it is the HTTP response code
             for (var i = 1; i < headerValues.Length; i++)
             {
                 var headerEntry = headerValues[i].Split(':');
-                Headers.Add(headerEntry[0], headerEntry[1]);
+                 Headers.Add(headerEntry[0], headerEntry[1]);
             }
 
             var statusRegex = new System.Text.RegularExpressions.Regex(@"^HTTP/\d+\.\d+ (\d+)(.*)$");

@@ -5,7 +5,7 @@ BetterHttpClient will help you making http and https requests with full cookie s
 It supports three types of proxy servers:
   - HTTP
   - HTTPS
-  - Socks5
+  - Socks5 (Tor network compatible)
 
 # Http Client
 - Http GET request
