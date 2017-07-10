@@ -43,6 +43,9 @@ namespace BetterHttpClient.Socks
 
         #region Methods
 
+        private static readonly char[] lineSplit = new char[] { '\r', '\n' };
+        private static readonly char[] valueSplit = new char[] { ':' };
+
         private void SetHeadersAndResponseContent(byte[] responseMessage)
         {
             if (responseMessage == null || responseMessage.Length < 4)
@@ -62,11 +65,11 @@ namespace BetterHttpClient.Socks
             if (string.IsNullOrEmpty(headers))
                 return;
 
-            var headerValues = headers.Split(new char[] { '\r','\n' }, StringSplitOptions.RemoveEmptyEntries); // some website may mix \r\n and \n only, this will raise an useless error on Headers.Add, so splitting separate char seems best idea
+            var headerValues = headers.Split(lineSplit, StringSplitOptions.RemoveEmptyEntries); // some website may mix \r\n and \n only, this will raise an useless error on Headers.Add, so splitting separate char seems best idea
             // ignore the first line in the header since it is the HTTP response code
             for (var i = 1; i < headerValues.Length; i++)
             {
-                var headerEntry = headerValues[i].Split(':');
+                var headerEntry = headerValues[i].Split(valueSplit, 2); // Redirect won't work if location absolute link : http://... is split (it will rediret to a dummy http://website.com/http ), need to split only first record
                  Headers.Add(headerEntry[0], headerEntry[1]);
             }
 
