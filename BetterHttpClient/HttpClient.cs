@@ -113,7 +113,12 @@ namespace BetterHttpClient
         /// </summary>
         public bool ValidateServerCertificateSocksProxy { get; set; } = true;
         
-
+        /// <summary>
+        /// Stay on the same root domain ?
+        /// Allow subdomain redirect (or protocol change), but disallow redirect to another base domain (XXXX.YYY)
+        /// </summary>
+        public bool RefuseOtherDomainRedirect { get; set; } = false;
+        
         /// <summary>
         /// Headers collection that will be added to each request
         /// </summary>
@@ -165,6 +170,7 @@ namespace BetterHttpClient
                 httpRequest.Referer = Referer;
                 httpRequest.AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip;
                 httpRequest.AllowAutoRedirect = AllowAutoRedirect;
+                // TO IMPLEMANT IF REQUIRED httpRequest.RefuseOtherDomainRedirect = RefuseOtherDomainRedirect;
             }
             else if (Proxy.ProxyType == ProxyTypeEnum.Socks)
             {
@@ -175,6 +181,7 @@ namespace BetterHttpClient
                 socksRequest.AllowAutoRedirect = AllowAutoRedirect;
                 socksRequest.DnsResolvedBySocksProxy = DnsResolvedBySocksProxy;
                 socksRequest.ValidateServerCertificateSocksProxy = ValidateServerCertificateSocksProxy;
+                socksRequest.RefuseOtherDomainRedirect = RefuseOtherDomainRedirect;
             }
 
             request.Timeout = (int) Timeout.TotalMilliseconds;

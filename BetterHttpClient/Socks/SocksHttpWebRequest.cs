@@ -120,11 +120,11 @@ namespace BetterHttpClient.Socks
         }
 
         public override long ContentLength { get; set; }
-
         public override string ContentType { get; set; }
         public bool AllowAutoRedirect { get; set; } = true;
         public bool DnsResolvedBySocksProxy { get; set; } = true;
         public bool ValidateServerCertificateSocksProxy { get; set; } = true;
+        public bool RefuseOtherDomainRedirect { get; set; } = false;
 
         public override WebResponse GetResponse()
         {
@@ -235,7 +235,7 @@ namespace BetterHttpClient.Socks
             }
         }
 
-        private string BuildHttpRequestMessage(Uri requestUri)
+        private string BuildHttpRequestMessage(Uri requestUri, short http1SubVers)
         {
             if (RequestSubmitted)
             {
@@ -253,7 +253,8 @@ namespace BetterHttpClient.Socks
             }
 
             var message = new StringBuilder();
-            message.AppendFormat("{0} {1} HTTP/1.1\r\nHost: {2}\r\n", Method, requestUri, requestUri.Host);
+
+            message.AppendFormat("{0} {1} HTTP/1.{2}\r\nHost: {3}\r\n", Method, requestUri.PathAndQuery, http1SubVers, requestUri.Host); // {1} follow RFC : client should use relative path (abs_path), full URI (absoluteURI) are for proxy, else it generate a lot of Bad Request result
 
             Headers.Set(HttpRequestHeader.Connection, "close");
 
@@ -297,7 +298,6 @@ namespace BetterHttpClient.Socks
                     message.Append(reader.ReadToEnd());
                 }
 
-
                 _requestContentStream.ForceClose();
                 _requestContentStream.Dispose();
             }
@@ -310,6 +310,7 @@ namespace BetterHttpClient.Socks
             Uri requestUri = RequestUri;
 
             int redirects = 0;
+            short http1SubVers = 1; // Use HTTP 1.1 by default, fallback to 1.0 if bad request : Unsupported method error
             const int maxAutoredirectCount = 10;
             while (redirects++ < maxAutoredirectCount)
             {
@@ -444,7 +445,7 @@ namespace BetterHttpClient.Socks
                         readStream = networkStream;
                     }
 
-                    string requestString = BuildHttpRequestMessage(requestUri);
+                    string requestString = BuildHttpRequestMessage(requestUri, http1SubVers);
 
                     var request = Encoding.ASCII.GetBytes(requestString);
                     readStream.Write(request, 0, request.Length);
@@ -464,24 +465,36 @@ namespace BetterHttpClient.Socks
 
                 var webResponse = new SocksHttpWebResponse(requestUri, response.ToArray());
 
-                if (webResponse.StatusCode == HttpStatusCode.Moved || webResponse.StatusCode == HttpStatusCode.MovedPermanently || webResponse.StatusCode == HttpStatusCode.Found) // found and moveds are similear
+                if ((int)webResponse.StatusCode >= 200 && (int)webResponse.StatusCode < 300) // optim : most probable case done in first in a if
+                {
+                    return webResponse;
+                }
+                else if (webResponse.StatusCode == HttpStatusCode.Moved || webResponse.StatusCode == HttpStatusCode.MovedPermanently || webResponse.StatusCode == HttpStatusCode.Found) // found and moveds are similear
                 {
                     string redirectUrl = webResponse.Headers["Location"];
                     if (string.IsNullOrEmpty(redirectUrl))
                         throw new WebException("Missing location for redirect");
-
-                    requestUri = new Uri(requestUri, redirectUrl);
                     if (AllowAutoRedirect)
                     {
+                        requestUri = new Uri(requestUri, redirectUrl); // set only if used for next try
+                        if (!RefuseOtherDomainRedirect || requestUri.DnsSafeHost == RequestUri.DnsSafeHost)
+                            continue;
+                        else
+                            throw new WebException(webResponse.StatusDescription, null, WebExceptionStatus.ProtocolError, webResponse);
+                    }
+                    else
+                        throw new WebException(webResponse.StatusDescription, null, WebExceptionStatus.ProtocolError, webResponse);
+                }
+                else if (webResponse.StatusCode == HttpStatusCode.BadRequest)
+                {
+                    var msg = webResponse.GetResponseString();
+                    if (msg != null && msg.StartsWith("HTTP/1.0") && http1SubVers == 1) // HTTP 1.1 may not be supported, try HTTP 1.0
+                    {
+                        http1SubVers = 0; // retry same URL in HTTP 1.0 instread of HTTP 1.1
                         continue;
                     }
-                    return webResponse;
                 }
-
-                if ((int)webResponse.StatusCode < 200 || (int)webResponse.StatusCode > 299)
-                    throw new WebException(webResponse.StatusDescription, null, WebExceptionStatus.UnknownError, webResponse);
-
-                return webResponse;
+                throw new WebException(webResponse.StatusDescription, null, WebExceptionStatus.UnknownError, webResponse);
             }
             throw new WebException("Too many redirects", null, WebExceptionStatus.ProtocolError, SocksHttpWebResponse.CreateErrorResponse(HttpStatusCode.BadRequest));
         }

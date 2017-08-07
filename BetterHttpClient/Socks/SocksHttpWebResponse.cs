@@ -232,7 +232,13 @@ namespace BetterHttpClient.Socks
 
         public override Stream GetResponseStream()
         {
-            return ResponseContent.Length == 0 ? Stream.Null : new MemoryStream(ResponseContent);
+            return ResponseContent.Length > 0 ? new MemoryStream(ResponseContent) : Stream.Null;
+        }
+
+
+        public string GetResponseString()
+        {
+            return ResponseContent.Length > 0 ? Encoding.Default.GetString(ResponseContent) : null;
         }
 
         public override void Close()
