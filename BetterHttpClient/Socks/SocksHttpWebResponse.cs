@@ -70,7 +70,8 @@ namespace BetterHttpClient.Socks
             for (var i = 1; i < headerValues.Length; i++)
             {
                 var headerEntry = headerValues[i].Split(valueSplit, 2); // Redirect won't work if location absolute link : http://... is split (it will rediret to a dummy http://website.com/http ), need to split only first record
-                 Headers.Add(headerEntry[0], headerEntry[1]);
+                if (headerEntry.Length == 2) // some site may insert no header info in header zone (like hostname) and don't have the dsqdsq: dsdsq header format
+                    Headers.Add(headerEntry[0], headerEntry[1]);
             }
 
             var statusRegex = new System.Text.RegularExpressions.Regex(@"^HTTP/\d+\.\d+ (\d+)(.*)$");
