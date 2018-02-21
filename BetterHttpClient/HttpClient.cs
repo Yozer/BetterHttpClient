@@ -100,6 +100,25 @@ namespace BetterHttpClient
         /// </summary>
         public bool AllowAutoRedirect { get; set; } = true;
 
+
+        /// <summary>
+        /// DNS Resolved by Proxy when Socks 5 used.
+        /// Mandatory for TOR proxy, recommanded for anonymity
+        /// </summary>
+        public bool DnsResolvedBySocksProxy { get; set; } = true;
+
+        /// <summary>
+        /// Validate HTTPS certificat on SocksProxy ?
+        /// The SslStream used won't follow the  servicePointManager checkCertificateName in the .config, so can be set here.
+        /// </summary>
+        public bool ValidateServerCertificateSocksProxy { get; set; } = true;
+        
+        /// <summary>
+        /// Stay on the same root domain ?
+        /// Allow subdomain redirect (or protocol change), but disallow redirect to another base domain (XXXX.YYY)
+        /// </summary>
+        public bool RefuseOtherDomainRedirect { get; set; } = false;
+        
         /// <summary>
         /// Headers collection that will be added to each request
         /// </summary>
@@ -151,6 +170,7 @@ namespace BetterHttpClient
                 httpRequest.Referer = Referer;
                 httpRequest.AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip;
                 httpRequest.AllowAutoRedirect = AllowAutoRedirect;
+                // TO IMPLEMANT IF REQUIRED httpRequest.RefuseOtherDomainRedirect = RefuseOtherDomainRedirect;
             }
             else if (Proxy.ProxyType == ProxyTypeEnum.Socks)
             {
@@ -159,6 +179,9 @@ namespace BetterHttpClient
                 socksRequest.Accept = Accept;
                 socksRequest.Referer = Referer;
                 socksRequest.AllowAutoRedirect = AllowAutoRedirect;
+                socksRequest.DnsResolvedBySocksProxy = DnsResolvedBySocksProxy;
+                socksRequest.ValidateServerCertificateSocksProxy = ValidateServerCertificateSocksProxy;
+                socksRequest.RefuseOtherDomainRedirect = RefuseOtherDomainRedirect;
             }
 
             request.Timeout = (int) Timeout.TotalMilliseconds;

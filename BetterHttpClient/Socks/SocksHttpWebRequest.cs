@@ -18,7 +18,7 @@ namespace BetterHttpClient.Socks
         private WebHeaderCollection _HttpRequestHeaders;
         private string _method;
         private byte[] _requestContentBuffer;
-        private NeverEndingStream _requestContentStream;
+        private NeverEndingStream _requestContentStream; // TOFIX : To BE DISPOSED
         private SocksHttpWebResponse _response;
 
         private SocksHttpWebRequest(Uri requestUri)
@@ -120,9 +120,11 @@ namespace BetterHttpClient.Socks
         }
 
         public override long ContentLength { get; set; }
-
         public override string ContentType { get; set; }
         public bool AllowAutoRedirect { get; set; } = true;
+        public bool DnsResolvedBySocksProxy { get; set; } = true;
+        public bool ValidateServerCertificateSocksProxy { get; set; } = true;
+        public bool RefuseOtherDomainRedirect { get; set; } = false;
 
         public override WebResponse GetResponse()
         {
@@ -233,7 +235,7 @@ namespace BetterHttpClient.Socks
             }
         }
 
-        private string BuildHttpRequestMessage(Uri requestUri)
+        private string BuildHttpRequestMessage(Uri requestUri, short http1SubVers)
         {
             if (RequestSubmitted)
             {
@@ -251,7 +253,8 @@ namespace BetterHttpClient.Socks
             }
 
             var message = new StringBuilder();
-            message.AppendFormat("{0} {1} HTTP/1.1\r\nHost: {2}\r\n", Method, requestUri, requestUri.Host);
+
+            message.AppendFormat("{0} {1} HTTP/1.{2}\r\nHost: {3}\r\n", Method, requestUri.PathAndQuery, http1SubVers, requestUri.Host); // {1} follow RFC : client should use relative path (abs_path), full URI (absoluteURI) are for proxy, else it generate a lot of Bad Request result
 
             Headers.Set(HttpRequestHeader.Connection, "close");
 
@@ -295,7 +298,6 @@ namespace BetterHttpClient.Socks
                     message.Append(reader.ReadToEnd());
                 }
 
-
                 _requestContentStream.ForceClose();
                 _requestContentStream.Dispose();
             }
@@ -308,6 +310,7 @@ namespace BetterHttpClient.Socks
             Uri requestUri = RequestUri;
 
             int redirects = 0;
+            short http1SubVers = 1; // Use HTTP 1.1 by default, fallback to 1.0 if bad request : Unsupported method error
             const int maxAutoredirectCount = 10;
             while (redirects++ < maxAutoredirectCount)
             {
@@ -347,16 +350,27 @@ namespace BetterHttpClient.Socks
                     }
 
                     // connect
-                    var destIP = Dns.GetHostEntry(requestUri.DnsSafeHost).AddressList[0];
                     var index = 0;
                     buf[index++] = 0x05; // version 5 .
                     buf[index++] = 0x01; // command = connect.
                     buf[index++] = 0x00; // Reserve = must be 0x00
 
-                    buf[index++] = 0x01; // Address is full-qualified domain name.
-                    var rawBytes = destIP.GetAddressBytes();
-                    rawBytes.CopyTo(buf, index);
-                    index += (ushort)rawBytes.Length;
+                    if (DnsResolvedBySocksProxy)
+                    {
+                        buf[index++] = 0x03; // Address is full-qualified domain name.
+                        buf[index++] = (byte)requestUri.DnsSafeHost.Length;
+                        byte[] rawBytes = Encoding.ASCII.GetBytes(requestUri.DnsSafeHost);
+                        rawBytes.CopyTo(buf, index);
+                        index += (ushort)rawBytes.Length;
+                    }
+                    else
+                    {
+                        IPAddress destIP = Dns.GetHostEntry(requestUri.DnsSafeHost).AddressList[0];
+                        buf[index++] = 0x01; // IP v4 Address
+                        byte[] rawBytes = destIP.GetAddressBytes();
+                        rawBytes.CopyTo(buf, index);
+                        index += (ushort)rawBytes.Length;
+                    }
 
                     var portBytes = BitConverter.GetBytes(Uri.UriSchemeHttps == requestUri.Scheme ? 443 : 80);
                     for (var i = portBytes.Length - 3; i >= 0; i--)
@@ -372,10 +386,22 @@ namespace BetterHttpClient.Socks
                     }
                     if (buf[1] != 0x00)
                     {
-                        throw new IOException($"Socks Error {buf[1]:X}");
+                        string err;
+                        switch (buf[1])
+                        {
+                            case 0x01: err = "General SOCKS server failure"; break;
+                            case 0x02: err = "Connection not allowed by ruleset"; break;
+                            case 0x03: err = "Network unreachable"; break;
+                            case 0x04: err = "Host unreachable"; break;
+                            case 0x05: err = "Connection refused"; break;
+                            case 0x06: err = "TTL expired"; break;
+                            case 0x07: err = "Command not supported"; break;
+                            case 0x08: err = "Address type not supported"; break;
+                            default: err = $"Socks Error {buf[1]:X}"; break;
+                        }
+                        throw new IOException(err);
                     }
-
-                    var rdest = string.Empty;
+                    var rdest = string.Empty; // TOFIX : usefull ????
                     switch (buf[3])
                     {
                         case 0x01: // IPv4
@@ -406,7 +432,11 @@ namespace BetterHttpClient.Socks
                     Stream readStream = null;
                     if (Uri.UriSchemeHttps == requestUri.Scheme)
                     {
-                        var ssl = new SslStream(networkStream);
+                        SslStream ssl;
+                        if (ValidateServerCertificateSocksProxy)
+                            ssl = new SslStream(networkStream);
+                        else
+                            ssl = new SslStream(networkStream, false, IgnoreValidateServerCertificate);
                         ssl.AuthenticateAsClient(requestUri.DnsSafeHost);
                         readStream = ssl;
                     }
@@ -415,7 +445,7 @@ namespace BetterHttpClient.Socks
                         readStream = networkStream;
                     }
 
-                    string requestString = BuildHttpRequestMessage(requestUri);
+                    string requestString = BuildHttpRequestMessage(requestUri, http1SubVers);
 
                     var request = Encoding.ASCII.GetBytes(requestString);
                     readStream.Write(request, 0, request.Length);
@@ -435,27 +465,43 @@ namespace BetterHttpClient.Socks
 
                 var webResponse = new SocksHttpWebResponse(requestUri, response.ToArray());
 
-                if (webResponse.StatusCode == HttpStatusCode.Moved || webResponse.StatusCode == HttpStatusCode.MovedPermanently)
+                if ((int)webResponse.StatusCode >= 200 && (int)webResponse.StatusCode < 300) // optim : most probable case done in first in a if
+                {
+                    return webResponse;
+                }
+                else if (webResponse.StatusCode == HttpStatusCode.Moved || webResponse.StatusCode == HttpStatusCode.MovedPermanently || webResponse.StatusCode == HttpStatusCode.Found) // found and moveds are similear
                 {
                     string redirectUrl = webResponse.Headers["Location"];
                     if (string.IsNullOrEmpty(redirectUrl))
                         throw new WebException("Missing location for redirect");
-
-                    requestUri = new Uri(requestUri, redirectUrl);
                     if (AllowAutoRedirect)
                     {
+                        requestUri = new Uri(requestUri, redirectUrl); // set only if used for next try
+                        if (!RefuseOtherDomainRedirect || requestUri.DnsSafeHost == RequestUri.DnsSafeHost)
+                            continue;
+                        else
+                            throw new WebException(webResponse.StatusDescription, null, WebExceptionStatus.ProtocolError, webResponse);
+                    }
+                    else
+                        throw new WebException(webResponse.StatusDescription, null, WebExceptionStatus.ProtocolError, webResponse);
+                }
+                else if (webResponse.StatusCode == HttpStatusCode.BadRequest)
+                {
+                    var msg = webResponse.GetResponseString();
+                    if (msg != null && msg.StartsWith("HTTP/1.0") && http1SubVers == 1) // HTTP 1.1 may not be supported, try HTTP 1.0
+                    {
+                        http1SubVers = 0; // retry same URL in HTTP 1.0 instread of HTTP 1.1
                         continue;
                     }
-                    return webResponse;
                 }
-
-                if ((int)webResponse.StatusCode < 200 || (int)webResponse.StatusCode > 299)
-                    throw new WebException(webResponse.StatusDescription, null, WebExceptionStatus.UnknownError, webResponse);
-
-                return webResponse;
+                throw new WebException(webResponse.StatusDescription, null, WebExceptionStatus.UnknownError, webResponse);
             }
-
             throw new WebException("Too many redirects", null, WebExceptionStatus.ProtocolError, SocksHttpWebResponse.CreateErrorResponse(HttpStatusCode.BadRequest));
+        }
+
+        private static bool IgnoreValidateServerCertificate(object sender, System.Security.Cryptography.X509Certificates.X509Certificate certificate, System.Security.Cryptography.X509Certificates.X509Chain chain, SslPolicyErrors sslPolicyErrors)
+        {
+            return true;
         }
 
         private static IPAddress GetProxyIpAddress(Uri proxyUri)
